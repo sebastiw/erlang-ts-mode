@@ -5,7 +5,8 @@
   (setq-local treesit-font-lock-feature-list
               '(()
                 ()
-                (vars
+                (strings
+                 vars
                  records macros
                  predefined-types
                  guards
@@ -16,7 +17,7 @@
                  fun-n ext-function-calls int-function-calls
                  ext-bifs int-bifs
                  function-header
-)
+                 )
                 ())
               )
 )
@@ -173,13 +174,21 @@ resulting regexp is surrounded by \\_< and \\_>."
   (defvar erlang-predefined-types
     '("any"
       "arity"
+      "atom"
+      "binary"
+      "bitstring"
       "boolean"
       "byte"
       "char"
       "cons"
       "deep_string"
+      "float"
+      "function"
       "iodata"
       "iolist"
+      "integer"
+      "list"
+      "number"
       "maybe_improper_list"
       "module"
       "mfa"
@@ -192,17 +201,21 @@ resulting regexp is surrounded by \\_< and \\_>."
       "nonempty_maybe_improper_list"
       "nonempty_string"
       "no_return"
+      "pid"
+      "port"
       "pos_integer"
+      "record"
+      "reference"
       "string"
       "term"
       "timeout"
+      "tuple"
       "map")
     "Erlang type specs types"))
 
 (eval-and-compile
   (defconst erlang-predefined-types-regexp
     (erlang-regexp-opt erlang-predefined-types 'symbols)))
-
 
 (eval-and-compile
   (defvar erlang-int-bifs
@@ -466,62 +479,73 @@ are highlighted by syntactic analysis.")
    :language 'erlang
    :override t
    :feature 'function-header
-   `((fun_decl clause: (function_clause name: (atom) @font-lock-function-name-face))
-     (spec fun: (atom) @font-lock-function-name-face))
+   `((fun_decl
+      clause: (function_clause
+               name: (atom) @font-lock-function-name-face))
+     (spec
+      fun: (atom) @font-lock-type-face))
 
    :language 'erlang
    :override t
    :feature 'int-bifs
-   `((call expr: (atom) @font-lock-builtin-face
-           (:match ,erlang-int-bif-regexp @font-lock-builtin-face)))
+   `((call
+      expr: (atom) @font-lock-builtin-face
+      (:match ,erlang-int-bif-regexp @font-lock-builtin-face)))
 
    :language 'erlang
    :override t
    :feature 'ext-bifs
    `((call
-       expr:
-       (remote
-        module: (remote_module module: (atom) ":")
-        fun: ((atom) @font-lock-builtin-face
-              (:match ,erlang-ext-bif-regexp @font-lock-builtin-face))))
-     (call
       expr:
       (remote
-       module: ((remote_module module: (atom) @font-lock-builtin-face ":")
-                (:equal "erlang" @font-lock-builtin-face))))
-     )
+       module: (remote_module module: (atom) ":")
+       fun: ((atom) @font-lock-builtin-face
+             (:match ,erlang-ext-bif-regexp @font-lock-builtin-face))))
+     (call
+      expr: (remote
+             module: ((remote_module
+                       module: (atom) @font-lock-builtin-face ":")
+                      (:equal "erlang" @font-lock-builtin-face)))))
 
    :language 'erlang
    :override nil
    :feature 'int-function-calls
-   `((call expr: (atom) @font-lock-type-face))
+   `((call
+      expr: (atom) @font-lock-type-face))
 
    :language 'erlang
    :override nil
    :feature 'ext-function-calls
    '((call
-       expr:
+      expr:
        (remote
         module: (remote_module module: (atom) ":")
         fun: (atom) @font-lock-type-face))
      (call
-      expr:
-      (remote
-       module: (remote_module module: (atom) @font-lock-type-face ":")))
-     )
+      expr: (remote
+             module: (remote_module
+                      module: (atom) @font-lock-type-face ":"))))
 
    :language 'erlang
    :override nil
    :feature 'fun-n
-   '(((binary_op_expr lhs: (atom) "/" rhs: (integer)) @font-lock-type-face)
-     ((fa fun: (atom)
-          arity: (arity "/" value: (integer))) @font-lock-type-face))
+   '(((binary_op_expr
+       lhs: (atom)
+       "/"
+       rhs: (integer)) @font-lock-type-face)
+     ((fa
+       fun: (atom)
+       arity: (arity "/" value: (integer))) @font-lock-type-face)
+     )
 
    :language 'erlang
    :override nil
    :feature 'operators
-   `((binary_op_expr lhs: (_) _ @font-lock-type-face rhs: (_)
-                     (:match ,erlang-operators-regexp @font-lock-type-face)))
+   `((binary_op_expr
+      lhs: (_)
+      _ @font-lock-type-face
+      rhs: (_)
+      (:match ,erlang-operators-regexp @font-lock-type-face)))
 
    :language 'erlang
    :override nil
@@ -625,15 +649,17 @@ are highlighted by syntactic analysis.")
    :language 'erlang
    :override t
    :feature 'guards
-   `((guard_clause exprs:
-                   (call expr: (atom) @font-lock-builtin-face
-                         (:match ,erlang-guards-regexp @font-lock-builtin-face))))
+   `((guard_clause
+      exprs: (call
+              expr: (atom) @font-lock-builtin-face
+              (:match ,erlang-guards-regexp @font-lock-builtin-face))))
 
    :language 'erlang
    :override t
    :feature 'predefined-types
-   `((call expr: (atom) @font-lock-builtin-face
-     (:match ,erlang-predefined-types-regexp @font-lock-builtin-face)))
+   `((call
+      expr: (atom) @font-lock-builtin-face
+      (:match ,erlang-predefined-types-regexp @font-lock-builtin-face)))
 
    :language 'erlang
    :override nil
@@ -651,6 +677,11 @@ are highlighted by syntactic analysis.")
    :override t
    :feature 'vars
    '((var) @font-lock-variable-name-face)
+
+   :language 'erlang
+   :override t
+   :feature 'strings
+   '((string) @font-lock-string-face)
 
    )
   "Tree-sitter font-lock settings for `trerl-mode'.")

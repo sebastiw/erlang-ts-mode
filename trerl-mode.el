@@ -116,7 +116,7 @@
 (define-derived-mode trerl-mode prog-mode "Erlang"
   "Major mode for editing Erlang, powered by tree-sitter."
   :group 'trerl
-  :syntax-table trerl-mode-syntax-table
+  ; :syntax-table trerl-mode-syntax-table
   :abbrev-table trerl-mode-abbrev-table
   (trerl-setup))
 
