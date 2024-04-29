@@ -1,26 +1,20 @@
 (defun trerl-treesit-font-lock-settings-setup()
-  (setq-local treesit-font-lock-settings trerl-mode--treesit-font-lock-settings)
+  (setq-local treesit-font-lock-settings trerl-mode-treesit-font-lock-settings)
   ;; Attempt to imitate erlang.el font-lock keywords levels
   (setq-local treesit-font-lock-level 4)
   (setq-local treesit-font-lock-feature-list
-              '(()
-                ()
-                (strings
-                 vars
-                 records macros
-                 predefined-types
-                 guards
-                 comment
-                                        ; quotes
-                 attr keywords
-                 lc arrow dollar operators
-                 fun-n ext-function-calls int-function-calls
-                 ext-bifs int-bifs
-                 function-header
+              '((comment errors
+                 ;; quotes
                  )
-                ())
-              )
-)
+                (keywords strings function-header)
+                (predefined-types vars records macros operators
+                 guards attr ext-bifs int-bifs)
+                (arrow dollar
+                 int-function-calls ext-function-calls
+                 exported-function-header
+                 fun-n lc)
+                )
+              ))
 
 (eval-and-compile
   (defconst erlang-atom-quoted-regexp
@@ -474,7 +468,7 @@ This is not the highlighting of Erlang strings and atoms, which
 are highlighted by syntactic analysis.")
 
 
-(defvar trerl-mode--treesit-font-lock-settings
+(defvar trerl-mode-treesit-font-lock-settings
   (treesit-font-lock-rules
    :language 'erlang
    :override t
@@ -517,10 +511,9 @@ are highlighted by syntactic analysis.")
    :override nil
    :feature 'ext-function-calls
    '((call
-      expr:
-       (remote
-        module: (remote_module module: (atom) ":")
-        fun: (atom) @font-lock-type-face))
+      expr: (remote
+             module: (remote_module module: (atom) ":")
+             fun: (atom) @font-lock-type-face))
      (call
       expr: (remote
              module: (remote_module
@@ -541,11 +534,8 @@ are highlighted by syntactic analysis.")
    :language 'erlang
    :override nil
    :feature 'operators
-   `((binary_op_expr
-      lhs: (_)
-      _ @font-lock-type-face
-      rhs: (_)
-      (:match ,erlang-operators-regexp @font-lock-type-face)))
+   `((binary_op_expr lhs: (_) _ @font-lock-builtin-face rhs: (_)
+      (:match ,erlang-operators-regexp @font-lock-builtin-face)))
 
    :language 'erlang
    :override nil
@@ -683,6 +673,10 @@ are highlighted by syntactic analysis.")
    :feature 'strings
    '((string) @font-lock-string-face)
 
+   :language 'erlang
+   :override t
+   :feature 'errors
+   '((ERROR) @font-lock-warning-face)
    )
   "Tree-sitter font-lock settings for `trerl-mode'.")
 
