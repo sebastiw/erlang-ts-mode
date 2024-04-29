@@ -25,6 +25,7 @@
   :prefix "trerl-")
 
 (require 'trerl-fontlock)
+(require 'trerl-indent)
 
 (defun trerl-setup()
   (when (treesit-ready-p 'erlang)
@@ -34,6 +35,7 @@
     (trerl-treesit-font-lock-settings-setup)
 
     ;; treesit-simple-indent-rules
+    (trerl-treesit-simple-indent-rules-setup)
 
     ;; treesit-defun-type-regexp
 
