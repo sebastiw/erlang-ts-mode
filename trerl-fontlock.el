@@ -3,7 +3,7 @@
   ;; Attempt to imitate erlang.el font-lock keywords levels
   (setq-local treesit-font-lock-level 4)
   (setq-local treesit-font-lock-feature-list
-              '((comment errors
+              '((comment errors delimiters
                  ;; quotes
                  )
                 (keywords strings function-header)
@@ -672,6 +672,14 @@ are highlighted by syntactic analysis.")
    :override t
    :feature 'strings
    '((string) @font-lock-string-face)
+
+   :language 'erlang
+   :override t
+   :feature 'delimiters
+   '((binary "<<" @font-lock-bracket-face)
+     (binary ">>" @font-lock-bracket-face)
+     (list "[" @font-lock-bracket-face)
+     (list "]" @font-lock-bracket-face))
 
    :language 'erlang
    :override t
