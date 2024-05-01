@@ -18,7 +18,13 @@
      ((and (parent-is "list") (field-is "exprs")) (nth-sibling 0) 1)
      ((parent-is "list") (nth-sibling 1) 0)
 
-     ((parent-is "binary") (nth-sibling 0) 1)
+     ;; <<<<A,B,C>> || {A,B,C} <= D>>
+     ((and (parent-is "binary") (node-is ",")) (nth-sibling 0) 1) ; , in A,
+     ((and (field-is "elements") (node-is "bin_element")) parent 2) ;; A
+     ((node-is "bin_element") (nth-sibling 1) 0) ;; B C
+     ((and (parent-is "binary") (field-is "expr")) parent 2) ; <<A,B,C>> and ||
+     ((and (parent-is "binary") (node-is ">>")) parent 0) ; >>
+     ((parent-is "b_generator") parent 0) ; <= and D
 
      ;; -record(foo, {bar, baz = 42 :: integer()}).
      ((and (parent-is "record_decl") (node-is "(")) (nth-sibling 1) 1)
@@ -87,9 +93,36 @@
      ((and (node-is "comment") (parent-is "expr")) grand-parent 0)
      ((node-is "comment") prev-sibling 0)
 
-     ((parent-is "args") prev-sibling 0)
-     ((parent-is "clause") prev-sibling 0)
-     ((parent-is "body") prev-sibling 0)
+     ;; begin X end
+     ((and (node-is "end") (parent-is "block_expr")) parent 0)
+     ((parent-is "block_expr") parent 2)
+
+     ;; try X catch C:E:T -> Y after Z end
+     ;; try X of A -> a; B -> b catch C:E:T -> Y after Z end
+     ((and (node-is "catch") (parent-is "try_expr")) parent 0)
+     ((and (node-is "after") (parent-is "try_expr")) parent 0)
+     ((and (node-is "end") (parent-is "try_expr")) parent 0)
+     ((parent-is "try_expr") parent 2)
+     ((parent-is "clause_body") parent-bol 2)
+
+     ;; fun () -> bar end
+     ;; if A -> B end
+     ;; case X of A -> B end
+     ((and (node-is "end") (parent-is "anonymous_fun")) parent 0)
+     ((and (node-is "end") (parent-is "if_expr")) parent 0)
+     ((and (node-is "end") (parent-is "case_expr")) parent 0)
+
+     ;; maybe X else A -> B end
+     ((and (node-is "else") (parent-is "maybe_expr")) parent 0)
+     ((and (node-is "end") (parent-is "maybe_expr")) parent 0)
+
+     ;; receive A -> B after X -> Y end
+     ((and (node-is "after") (parent-is "receive_expr")) parent 0)
+     ((and (node-is "end") (parent-is "receive_expr")) parent 0)
+
+     ((parent-is "args") grand-parent 2)
+     ((parent-is "clause") grand-parent 2)
+     ((parent-is "body") grand-parent 2)
 
      ((node-is "module_attribute") parent-bol 0)
      ((parent-is "fun_decl") parent 0)
