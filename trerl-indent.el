@@ -103,7 +103,7 @@
      ((and (node-is "after") (parent-is "try_expr")) parent 0)
      ((and (node-is "end") (parent-is "try_expr")) parent 0)
      ((parent-is "try_expr") parent 2)
-     ((parent-is "clause_body") parent-bol 2)
+     ((and (parent-is "clause_body") (node-is "try_expr")) parent-bol 2)
 
      ;; fun () -> bar end
      ;; if A -> B end
@@ -121,16 +121,18 @@
      ((and (node-is "end") (parent-is "receive_expr")) parent 0)
 
      ((parent-is "args") grand-parent 2)
-     ((parent-is "clause") grand-parent 2)
-     ((parent-is "body") grand-parent 2)
+
+     ;; fun(A,B,C) when X -> Y end
+     ((parent-is "fun_clause") prev-sibling 0)
+     ((n-p-gp nil "clause_body" "fun_clause") grand-parent 2)
+     ((node-is "fun_clause") prev-sibling 0)
+     ((node-is "fun_clause") prev-sibling 0)
 
      ((node-is "module_attribute") parent-bol 0)
      ((parent-is "fun_decl") parent 0)
-     ((node-is "function_clause") parent-bol 0)
-     ((node-is "]") prev-adaptive-prefix 9)
-     ((node-is ">") parent-bol 0)
-     ((node-is "\"") parent-bol 0)
      ((parent-is "-") parent-bol 0)
+
+     ((node-is "\"") parent-bol 0)
      (catch-all standalone-parent 2)
      ))
     "Indentation rules for trErl.")
