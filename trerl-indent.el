@@ -12,6 +12,12 @@
      ((parent-is "source_file") parent-bol 0)
      ((node-is "\\.") parent-bol 0)
 
+     ;; { 1, 2, 3, a, b, c }
+     ((and (parent-is "tuple") (node-is ",")) (nth-sibling 0) 0)
+     ((and (parent-is "tuple") (node-is "}")) (nth-sibling 0) 0)
+     ((and (parent-is "tuple") (field-is "expr")) (nth-sibling 0) 1)
+     ((parent-is "tuple") (nth-sibling 1) 0)
+
      ;; [ 1, 2, 3, a, b, c ]
      ((and (parent-is "list") (node-is ",")) (nth-sibling 0) 0)
      ((and (parent-is "list") (node-is "]")) (nth-sibling 0) 0)
@@ -99,9 +105,10 @@
 
      ;; try X catch C:E:T -> Y after Z end
      ;; try X of A -> a; B -> b catch C:E:T -> Y after Z end
-     ((and (node-is "catch") (parent-is "try_expr")) parent 0)
-     ((and (node-is "after") (parent-is "try_expr")) parent 0)
-     ((and (node-is "end") (parent-is "try_expr")) parent 0)
+     ((and (parent-is "try_expr") (node-is "catch_clause")) prev-sibling 0)
+     ((and (parent-is "try_expr") (node-is "catch")) parent 0)
+     ((and (parent-is "try_expr") (node-is "after")) parent 0)
+     ((and (parent-is "try_expr") (node-is "end")) parent 0)
      ((parent-is "try_expr") parent 2)
      ((and (parent-is "clause_body") (node-is "try_expr")) parent-bol 2)
 
@@ -120,13 +127,41 @@
      ((and (node-is "after") (parent-is "receive_expr")) parent 0)
      ((and (node-is "end") (parent-is "receive_expr")) parent 0)
 
-     ((parent-is "args") grand-parent 2)
 
      ;; fun(A,B,C) when X -> Y end
      ((parent-is "fun_clause") prev-sibling 0)
      ((n-p-gp nil "clause_body" "fun_clause") grand-parent 2)
      ((node-is "fun_clause") prev-sibling 0)
      ((node-is "fun_clause") prev-sibling 0)
+
+     ;; foo:bar(a, b, c)
+     ;; Support three different styles for the arguments
+     ;; 1 foo:bar(A,
+     ;;           B,
+     ;;           C)
+     ;; 2 foo:bar( A
+     ;;          , B
+     ;;          , C )
+     ;; 3 foo:bar(
+     ;;     A,
+     ;;     B,
+     ;;     C
+     ;;   )
+     ((and (parent-is "expr_args") (node-is ",")) parent 0)
+     ((and (parent-is "expr_args") (field-is "args")) grand-parent 2)
+     ((and (parent-is "expr_args") (node-is ")")) prev-sibling -2)
+     ((parent-is "expr_args") (nth-sibling 1) 0)
+
+     ;; ?macro(a, b, c)
+     ;; similar style as fun-calls
+     ((and (parent-is "macro_call_args") (node-is ",")) parent 0)
+     ((and (parent-is "macro_call_args") (field-is "args")) grand-parent 2)
+     ((and (parent-is "macro_call_args") (node-is ")")) prev-sibling -2)
+     ((parent-is "macro_call_args") (nth-sibling 1) 0)
+
+     ((parent-is "concatables") prev-sibling 0)
+
+     ((parent-is "args") first-sibling 0)
 
      ((node-is "module_attribute") parent-bol 0)
      ((parent-is "fun_decl") parent 0)
