@@ -26,6 +26,7 @@
 
 (require 'trerl-fontlock)
 (require 'trerl-indent)
+(require 'trerl-imenu)
 
 (defun trerl-setup()
   (when (treesit-ready-p 'erlang)
@@ -42,6 +43,7 @@
     ;; treesit-defun-name-function
 
     ;; treesit-simple-imenu-settings
+    (trerl-treesit-simple-imenu-settings-setup)
 
     (treesit-major-mode-setup)))
 
