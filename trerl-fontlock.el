@@ -1,3 +1,8 @@
+;;;
+;;; This file provides syntax highlighting rules.
+;;;
+;;; You can use `treesit-explore-mode' to find the nodes to match.
+
 (defun trerl-treesit-font-lock-settings-setup()
   (setq-local treesit-font-lock-settings trerl-mode-treesit-font-lock-settings)
   ;; Attempt to imitate erlang.el font-lock keywords levels

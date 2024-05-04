@@ -1,10 +1,13 @@
+;;;
+;;; This file provides indentation rules.
+;;;
+;;; To debug you can use `treesit-inspect-mode' to see which node point is on.
+;;; Optionally you can set `treesit--indent-verbose' and/or call
+;;; `treesit-check-indent'.
+
 (defun trerl-treesit-simple-indent-rules-setup()
   (setq-local indent-tabs-mode nil)
-  (setq-local treesit--indent-verbose t)
-  ; (treesit-explore-mode 'erlang)
-  (treesit-inspect-mode)
   (setq-local treesit-simple-indent-rules trerl-mode-indent-rules)
-;  (treesit-check-indent)
 )
 
 (defvar trerl-mode-indent-rules

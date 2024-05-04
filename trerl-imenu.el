@@ -1,7 +1,7 @@
 ;;;
-;;; Imenu provides jump-tables
+;;; This file provides provides jump-tables for imenu.
 ;;; e.g. by
-;;; M-x imenu[RET] CATEGORY[RET] COMPLETION[RET]
+;;; M-x imenu[RET] CATEGORY[RET] DISPLAY-NAME[RET]
 ;;;
 ;;; When testing remember to evaluate `imenu-flush-cache' in between
 ;;; reevaluations of any of these functions to clear the imenu cache.

@@ -1,23 +1,10 @@
-(when (< emacs-major-version 29)
-    (error "trErl requires Emacs >= 29.0"))
-
-;; Tree-sitter offers different features than emacs’ native
-;; parser. two things are required to activate it:
-;;     1. Install a Tree-sitter library for the required language.
-;;     2. A major mode that invokes the Tree-sitter backend.
-;;
-;; Usual naming of ts-major mode would be LANG-ts-mode, e.g. erlang-ts-mode
-
-(require 'treesit)
+(require 'treesit nil t)
 (unless (featurep 'treesit)
   (error "trErl requires tree-sitter to be installed"))
 
 (unless (treesit-language-available-p 'erlang)
-  (error "trErl requires tresit-language for Erlang to be installed"))
-
-(add-to-list 'treesit-language-source-alist (cons 'erlang '("https://github.com/WhatsApp/tree-sitter-erlang")))
-(if (not (treesit-language-available-p 'erlang))
-    (treesit-install-language-grammar 'erlang))
+  (add-to-list 'treesit-language-source-alist (cons 'erlang '("https://github.com/WhatsApp/tree-sitter-erlang")))
+  (treesit-install-language-grammar 'erlang))
 
 (defgroup trerl nil
   "Tree-sitter for Erlang."
