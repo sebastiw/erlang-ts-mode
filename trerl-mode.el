@@ -14,6 +14,7 @@
 (require 'trerl-fontlock)
 (require 'trerl-indent)
 (require 'trerl-imenu)
+(require 'trerl-defun)
 
 (defun trerl-setup()
   (when (treesit-ready-p 'erlang)
@@ -26,8 +27,10 @@
     (trerl-treesit-simple-indent-rules-setup)
 
     ;; treesit-defun-type-regexp
+    (trerl-treesit-defun-type-regexp-setup)
 
     ;; treesit-defun-name-function
+    (trerl-treesit-defun-name-function-setup)
 
     ;; treesit-simple-imenu-settings
     (trerl-treesit-simple-imenu-settings-setup)
