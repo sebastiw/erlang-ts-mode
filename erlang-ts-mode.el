@@ -13,8 +13,12 @@
 (unless (treesit-language-available-p 'erlang)
   (add-to-list
    'treesit-language-source-alist
+<<<<<<< HEAD:erlang-ts-mode.el
    (cons 'erlang '("https://github.com/WhatsApp/tree-sitter-erlang")))
 
+=======
+   (cons 'erlang '("https://git.sr.ht/~massemanet/tree-sitter-erlang")))
+>>>>>>> ff1a933 (syntax highlight works. Ditched whatsapp.):trerl-mode.el
   (treesit-install-language-grammar 'erlang))
 
 (defgroup erlang-ts nil
@@ -22,41 +26,17 @@
   :group 'languages
   :prefix "erlang-ts-")
 
-;;(require 'trerl-fontlock nil t)
+(require 'trerl-fontlock nil t)
 (require 'trerl-indent nil t)
 (require 'trerl-imenu nil t)
 (require 'trerl-defun nil t)
 
-;;(treesit-parser-create 'erlang)
-(defvar trerl-font-lock-rules
-  '(:language erlang :override t :feature
-              comment
-              ((comment) @font-lock-comment-face)
-              :language erlang :override t :feature
-              string
-              ((string) @font-lock-string-face)
-              :language erlang :override t :feature
-              variable-name
-              ((var) @font-lock-variable-name-face)
-              :language erlang :override nil :feature
-              constant
-              ((atom) @font-lock-constant-face)))
-))
-
-(defvar trerl-font-lock-feature-list
-  '((comment string doc) ; level 1
-    (function-name keyword type builtin constant) ; level 2
-    (variable-name string-interpolation key))) ; level 3
-
 (defun trerl-setup()
   "Initialize."
   (setq-local
-   treesit-simple-indent-rules ()
    treesit-defun-type-regexp ()
    treesit-defun-name-function ()
-   treesit-simple-imenu-settings ()
-   treesit-font-lock-settings (apply #'treesit-font-lock-rules trerl-font-lock-rules)
-   treesit-font-lock-feature-list trerl-font-lock-feature-list)
+   treesit-simple-imenu-settings ())
   (treesit-major-mode-setup))
 
 (defvar erlang-ts-mode-map
@@ -91,7 +71,8 @@
     map)
   "Keymap for trErl.")
 
-(defvar trerl-mode-abbrev-table nil
+(defvar trerl-mode-abbrev-table
+  nil
   "Abbrev table in use in trerl-mode buffers.")
 
 ;;;###autoload
