@@ -5,12 +5,12 @@
 ;;; Optionally you can set `treesit--indent-verbose' and/or call
 ;;; `treesit-check-indent'.
 
-(defun trerl-treesit-simple-indent-rules-setup()
+(defun erlang-ts-treesit-simple-indent-rules-setup()
   (setq-local indent-tabs-mode nil)
-  (setq-local treesit-simple-indent-rules trerl-mode-indent-rules)
+  (setq-local treesit-simple-indent-rules erlang-ts-mode-indent-rules)
 )
 
-(defvar trerl-mode-indent-rules
+(defvar erlang-ts-mode-indent-rules
   `((erlang
      ((parent-is "source_file") parent-bol 0)
      ((node-is "\\.") parent-bol 0)
@@ -175,4 +175,4 @@
      ))
     "Indentation rules for trErl.")
 
-(provide 'trerl-indent)
+(provide 'erlang-ts-indent)

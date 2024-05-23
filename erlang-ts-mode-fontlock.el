@@ -3,8 +3,8 @@
 ;;;
 ;;; You can use `treesit-explore-mode' to find the nodes to match.
 
-(defun trerl-treesit-font-lock-settings-setup()
-  (setq-local treesit-font-lock-settings trerl-mode-treesit-font-lock-settings)
+(defun erlang-ts-treesit-font-lock-settings-setup()
+  (setq-local treesit-font-lock-settings erlang-ts-mode-treesit-font-lock-settings)
   ;; Attempt to imitate erlang.el font-lock keywords levels
   (setq-local treesit-font-lock-level 4)
   (setq-local treesit-font-lock-feature-list
@@ -473,7 +473,7 @@ This is not the highlighting of Erlang strings and atoms, which
 are highlighted by syntactic analysis.")
 
 
-(defvar trerl-mode-treesit-font-lock-settings
+(defvar erlang-ts-mode-treesit-font-lock-settings
   (treesit-font-lock-rules
    :language 'erlang
    :override t
@@ -691,6 +691,6 @@ are highlighted by syntactic analysis.")
    :feature 'errors
    '((ERROR) @font-lock-warning-face)
    )
-  "Tree-sitter font-lock settings for `trerl-mode'.")
+  "Tree-sitter font-lock settings for `erlang-ts-mode'.")
 
-(provide 'trerl-fontlock)
+(provide 'erlang-ts-fontlock)

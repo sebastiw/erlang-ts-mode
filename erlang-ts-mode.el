@@ -2,74 +2,74 @@
 (unless (featurep 'treesit)
   (error "trErl requires tree-sitter to be installed"))
 
-(unless (treesit-language-available-p 'erlang)
+(unless (and (version<= "29.1" emacs-version) (treesit-language-available-p 'erlang))
   (add-to-list 'treesit-language-source-alist (cons 'erlang '("https://github.com/WhatsApp/tree-sitter-erlang")))
   (treesit-install-language-grammar 'erlang))
 
-(defgroup trerl nil
+(defgroup erlang-ts nil
   "Tree-sitter for Erlang."
   :group 'languages
-  :prefix "trerl-")
+  :prefix "erlang-ts-")
 
-(require 'trerl-fontlock)
-(require 'trerl-indent)
-(require 'trerl-imenu)
-(require 'trerl-defun)
+(require 'erlang-ts-fontlock)
+(require 'erlang-ts-indent)
+(require 'erlang-ts-imenu)
+(require 'erlang-ts-defun)
 
-(defun trerl-setup()
+(defun erlang-ts-setup()
   (when (treesit-ready-p 'erlang)
     (treesit-parser-create 'erlang)
 
     ;; treesit-font-lock-settings
-    (trerl-treesit-font-lock-settings-setup)
+    (erlang-ts-treesit-font-lock-settings-setup)
 
     ;; treesit-simple-indent-rules
-    (trerl-treesit-simple-indent-rules-setup)
+    (erlang-ts-treesit-simple-indent-rules-setup)
 
     ;; treesit-defun-type-regexp
-    (trerl-treesit-defun-type-regexp-setup)
+    (erlang-ts-treesit-defun-type-regexp-setup)
 
     ;; treesit-defun-name-function
-    (trerl-treesit-defun-name-function-setup)
+    (erlang-ts-treesit-defun-name-function-setup)
 
     ;; treesit-simple-imenu-settings
-    (trerl-treesit-simple-imenu-settings-setup)
+    (erlang-ts-treesit-simple-imenu-settings-setup)
 
     (treesit-major-mode-setup)))
 
-(defvar trerl-mode-map
+(defvar erlang-ts-mode-map
   ;; Similar bindings as erlang-mode
   (let ((map (make-sparse-keymap)))
-    ; (define-key map ";"       'trerl-electric-semicolon)
-    ; (define-key map ","       'trerl-electric-comma)
-    ; (define-key map "<"         'trerl-electric-lt)
-    ; (define-key map ">"         'trerl-electric-gt)
-    ; (define-key map "\C-m"      'trerl-electric-newline)
+    ; (define-key map ";"       'erlang-ts-electric-semicolon)
+    ; (define-key map ","       'erlang-ts-electric-comma)
+    ; (define-key map "<"         'erlang-ts-electric-lt)
+    ; (define-key map ">"         'erlang-ts-electric-gt)
+    ; (define-key map "\C-m"      'erlang-ts-electric-newline)
     (define-key map (kbd "DEL") 'backward-delete-char-untabify)
-    ; (define-key map "\M-q"      'trerl-fill-paragraph)
-    ; (define-key map "\M-\t"     'trerl-complete-tag)
+    ; (define-key map "\M-q"      'erlang-ts-fill-paragraph)
+    ; (define-key map "\M-\t"     'erlang-ts-complete-tag)
     ; (define-key map "\C-c\M-\t" 'tempo-complete-tag)
-    ; (define-key map "\M-+"      'trerl-find-next-tag)
-    ; (define-key map "\C-c\M-a"  'trerl-beginning-of-clause)
+    ; (define-key map "\M-+"      'erlang-ts-find-next-tag)
+    ; (define-key map "\C-c\M-a"  'erlang-ts-beginning-of-clause)
     ; (define-key map "\C-c\M-b"  'tempo-backward-mark)
-    ; (define-key map "\C-c\M-e"  'trerl-end-of-clause)
+    ; (define-key map "\C-c\M-e"  'erlang-ts-end-of-clause)
     ; (define-key map "\C-c\M-f"  'tempo-forward-mark)
-    ; (define-key map "\C-c\M-h"  'trerl-mark-clause)
+    ; (define-key map "\C-c\M-h"  'erlang-ts-mark-clause)
     (define-key map "\C-c\C-c"  'comment-region)
-    ; (define-key map "\C-c\C-j"  'trerl-generate-new-clause)
-    ; (define-key map "\C-c\C-k"  'trerl-compile)
-    ; (define-key map "\C-c\C-l"  'trerl-compile-display)
-    ; (define-key map "\C-c\C-s"  'trerl-show-syntactic-information)
-    ; (define-key map "\C-c\C-q"  'trerl-indent-function)
+    ; (define-key map "\C-c\C-j"  'erlang-ts-generate-new-clause)
+    ; (define-key map "\C-c\C-k"  'erlang-ts-compile)
+    ; (define-key map "\C-c\C-l"  'erlang-ts-compile-display)
+    ; (define-key map "\C-c\C-s"  'erlang-ts-show-syntactic-information)
+    ; (define-key map "\C-c\C-q"  'erlang-ts-indent-function)
     (define-key map "\C-c\C-u"  'uncomment-region)
-    ; (define-key map "\C-c\C-y"  'trerl-clone-arguments)
-    ; (define-key map "\C-c\C-a"  'trerl-align-arrows)
-    ; (define-key map "\C-c\C-z"  'trerl-shell-display)
-    ; (define-key map "\C-c\C-d"  'trerl-man-function-no-prompt)
+    ; (define-key map "\C-c\C-y"  'erlang-ts-clone-arguments)
+    ; (define-key map "\C-c\C-a"  'erlang-ts-align-arrows)
+    ; (define-key map "\C-c\C-z"  'erlang-ts-shell-display)
+    ; (define-key map "\C-c\C-d"  'erlang-ts-man-function-no-prompt)
     map)
   "Keymap for trErl.")
 
-(defvar trerl-mode-syntax-table
+(defvar erlang-ts-mode-syntax-table
   ;; Import from erlang-mode
   (let ((table (make-syntax-table)))
       (modify-syntax-entry ?\n ">" table)
@@ -101,22 +101,22 @@
       ;;(modify-syntax-entry ?\273 ")?\253" table)
 
       (setq erlang-mode-syntax-table table))
-  "Syntax table in use in trerl-mode buffers.")
+  "Syntax table in use in erlang-ts-mode buffers.")
 
-(defvar trerl-mode-abbrev-table nil
-  "Abbrev table in use in trerl-mode buffers.")
+(defvar erlang-ts-mode-abbrev-table nil
+  "Abbrev table in use in erlang-ts-mode buffers.")
 
 ;;;###autoload
-(define-derived-mode trerl-mode prog-mode "Erlang"
+(define-derived-mode erlang-ts-mode prog-mode "Erlang"
   "Major mode for editing Erlang, powered by tree-sitter."
-  :group 'trerl
-  ; :syntax-table trerl-mode-syntax-table
-  :abbrev-table trerl-mode-abbrev-table
-  (trerl-setup))
+  :group 'erlang-ts
+  ; :syntax-table erlang-ts-mode-syntax-table
+  :abbrev-table erlang-ts-mode-abbrev-table
+  (erlang-ts-setup))
 
 ;;;###autoload
 (dolist (r '("\\.erl$" "\\.app\\.src$" "\\.escript"
              "\\.hrl$" "\\.xrl$" "\\.yrl" "/ebin/.+\\.app"))
-  (add-to-list 'auto-mode-alist (cons r 'trerl-mode)))
+  (add-to-list 'auto-mode-alist (cons r 'erlang-ts-mode)))
 
-(provide 'trerl-mode)
+(provide 'erlang-ts-mode)
