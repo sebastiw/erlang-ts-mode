@@ -1,4 +1,4 @@
-;;; trerl-indent --- Provides indentation rules.
+;;; erlang-ts-indent --- Provides indentation rules.
 ;;;
 ;;; Commentary:
 ;;; To debug you can use `treesit-inspect-mode' to see which node point is on.
@@ -7,17 +7,6 @@
 ;;;
 ;;; Code:
 
-<<<<<<< HEAD:erlang-ts-indent.el
-(defun erlang-ts-treesit-simple-indent-rules-setup()
-  (setq-local indent-tabs-mode nil)
-  (setq-local treesit-simple-indent-rules erlang-ts-mode-indent-rules)
-)
-
-(defvar erlang-ts-mode-indent-rules
-  `((erlang
-     ((parent-is "source_file") parent-bol 0)
-     ((node-is "\\.") parent-bol 0)
-=======
 (setq-local
  indent-tabs-mode nil
  treesit-simple-indent-rules
@@ -30,7 +19,6 @@
     ((and (parent-is "tuple") (node-is "}")) (nth-sibling 0) 0)
     ((and (parent-is "tuple") (field-is "expr")) (nth-sibling 0) 1)
     ((parent-is "tuple") (nth-sibling 1) 0)
->>>>>>> ff1a933 (syntax highlight works. Ditched whatsapp.):trerl-indent.el
 
     ;; [ 1, 2, 3, a, b, c ]
     ((and (parent-is "list") (node-is ",")) (nth-sibling 0) 0)
@@ -40,9 +28,9 @@
 
     ;; <<<<A,B,C>> || {A,B,C} <= D>>
     ((and (parent-is "binary") (node-is ",")) (nth-sibling 0) 1) ; , in A,
-    ((and (field-is "elements") (node-is "bin_element")) parent 2) ;; A
+    ((and (field-is "elements") (node-is "bin_element")) parent 4) ;; A
     ((node-is "bin_element") (nth-sibling 1) 0) ;; B C
-    ((and (parent-is "binary") (field-is "expr")) parent 2) ; <<A,B,C>> and ||
+    ((and (parent-is "binary") (field-is "expr")) parent 4) ; <<A,B,C>> and ||
     ((and (parent-is "binary") (node-is ">>")) parent 0) ; >>
     ((parent-is "b_generator") parent 0) ; <= and D
 
@@ -115,7 +103,7 @@
 
     ;; begin X end
     ((and (node-is "end") (parent-is "block_expr")) parent 0)
-    ((parent-is "block_expr") parent 2)
+    ((parent-is "block_expr") parent 4)
 
     ;; try X catch C:E:T -> Y after Z end
     ;; try X of A -> a; B -> b catch C:E:T -> Y after Z end
@@ -123,11 +111,12 @@
     ((and (parent-is "try_expr") (node-is "catch")) parent 0)
     ((and (parent-is "try_expr") (node-is "after")) parent 0)
     ((and (parent-is "try_expr") (node-is "end")) parent 0)
-    ((parent-is "try_expr") parent 2)
-    ((and (parent-is "clause_body") (node-is "try_expr")) parent-bol 2)
+    ((parent-is "try_expr") parent 4)
+    ((and (parent-is "clause_body") (node-is "try_expr")) parent-bol 4)
 
     ;; fun () -> bar end
     ;; if A -> B end
+
     ;; case X of A -> B end
     ((and (node-is "end") (parent-is "anonymous_fun")) parent 0)
     ((and (node-is "end") (parent-is "if_expr")) parent 0)
@@ -144,7 +133,7 @@
 
     ;; fun(A,B,C) when X -> Y end
     ((parent-is "fun_clause") prev-sibling 0)
-    ((n-p-gp nil "clause_body" "fun_clause") grand-parent 2)
+    ((n-p-gp nil "clause_body" "fun_clause") grand-parent 4)
     ((node-is "fun_clause") prev-sibling 0)
     ((node-is "fun_clause") prev-sibling 0)
 
@@ -162,15 +151,15 @@
     ;;     C
     ;;   )
     ((and (parent-is "expr_args") (node-is ",")) parent 0)
-    ((and (parent-is "expr_args") (field-is "args")) grand-parent 2)
-    ((and (parent-is "expr_args") (node-is ")")) prev-sibling -2)
+    ((and (parent-is "expr_args") (field-is "args")) grand-parent 4)
+    ((and (parent-is "expr_args") (node-is ")")) prev-sibling -4)
     ((parent-is "expr_args") (nth-sibling 1) 0)
 
     ;; ?macro(a, b, c)
     ;; similar style as fun-calls
     ((and (parent-is "macro_call_args") (node-is ",")) parent 0)
-    ((and (parent-is "macro_call_args") (field-is "args")) grand-parent 2)
-    ((and (parent-is "macro_call_args") (node-is ")")) prev-sibling -2)
+    ((and (parent-is "macro_call_args") (field-is "args")) grand-parent 4)
+    ((and (parent-is "macro_call_args") (node-is ")")) prev-sibling -4)
     ((parent-is "macro_call_args") (nth-sibling 1) 0)
 
     ((parent-is "concatables") prev-sibling 0)
@@ -182,11 +171,7 @@
     ((parent-is "-") parent-bol 0)
 
     ((node-is "\"") parent-bol 0)
-    (catch-all standalone-parent 2))))
+    (catch-all standalone-parent 4))))
 
-<<<<<<< HEAD:erlang-ts-indent.el
 (provide 'erlang-ts-indent)
-=======
-(provide 'trerl-indent)
-;;; trerl-indent.el ends here
->>>>>>> ff1a933 (syntax highlight works. Ditched whatsapp.):trerl-indent.el
+;;; erlang-ts-indent.el ends here
