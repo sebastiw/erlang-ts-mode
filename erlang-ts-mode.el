@@ -9,6 +9,12 @@
 (unless (featurep 'treesit)
   (error "Erlang-ts requires tree-sitter to be installed"))
 
+(require 'erlang-ts-mode-map nil t)
+(require 'erlang-ts-fontlock nil t)
+(require 'erlang-ts-indent nil t)
+(require 'erlang-ts-imenu nil t)
+(require 'erlang-ts-defun nil t)
+
 (defvar treesit-language-source-alist)
 (unless (treesit-language-available-p 'erlang)
   (add-to-list
@@ -23,11 +29,31 @@
 
 (defun erlang-ts-setup()
   "Initialize."
-  (require 'erlang-ts-mode-map nil t)
-  (require 'erlang-ts-fontlock nil t)
-  (require 'erlang-ts-indent nil t)
-  (require 'erlang-ts-imenu nil t)
-  (require 'erlang-ts-defun nil t)
+  (treesit-parser-create 'erlang)
+
+  ;; If ‘treesit-font-lock-settings’ is non-nil, set up fontification
+  ;; and enable ‘font-lock-mode’.
+  (setq-local
+   treesit-font-lock-settings (erlang-ts-fontlock)
+   treesit-font-lock-feature-list (erlang-ts-fontlock-features))
+
+  ;; If ‘treesit-simple-indent-rules’ is non-nil, set up indentation.
+  (setq-local
+   indent-tabs-mode nil
+   treesit-simple-indent-rules (erlang-ts-indent))
+
+  ;; If ‘treesit-defun-type-regexp’ is non-nil, set up
+  ;; ‘beginning-of-defun-function’ and ‘end-of-defun-function’.
+  ;; If ‘treesit-defun-name-function’ is non-nil, set up
+  ;; ‘add-log-current-defun’.
+  (setq-local
+   treesit-defun-type-regexp (erlang-ts-defun-regexp)
+   treesit-defun-name-function 'erlang-ts-defun-function-name)
+
+  ;; If ‘treesit-simple-imenu-settings’ is non-nil, set up Imenu.
+  (setq-local
+   treesit-simple-imenu-settings (erlang-ts-imenu-simple))
+
   (treesit-major-mode-setup))
 
 (defvar erlang-ts-mode-abbrev-table
@@ -40,7 +66,6 @@
   :group 'erlang-ts
   :abbrev-table erlang-ts-mode-abbrev-table
   (when (treesit-ready-p 'erlang)
-    (treesit-parser-create 'erlang)
     (erlang-ts-setup)))
 
 ;;;###autoload

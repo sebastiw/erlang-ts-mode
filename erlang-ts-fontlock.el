@@ -8,6 +8,12 @@
 
 (require 'treesit)
 
+(defun erlang-ts-fontlock-features ()
+  "A `treesit-font-lock-feature-list'."
+  '((comment string doc) ; level 1
+    (function-name keyword type builtin constant) ; level 2
+    (variable-name string-interpolation key))) ; level 3
+
 (defvar erlang-ts-fontlock-rules
   '(:language erlang :override t :feature
               comment
@@ -25,14 +31,9 @@
               constant
               ((atom) @font-lock-constant-face)))
 
-(defvar erlang-ts-font-lock-feature-list
-  '((comment string doc) ; level 1
-    (function-name keyword type builtin constant) ; level 2
-    (variable-name string-interpolation key))) ; level 3
-
-(setq-local
- treesit-font-lock-settings (apply #'treesit-font-lock-rules erlang-ts-fontlock-rules)
- treesit-font-lock-feature-list erlang-ts-font-lock-feature-list)
+(defun erlang-ts-fontlock ()
+  "Return a `treesit-font-lock-settings."
+  (apply #'treesit-font-lock-rules erlang-ts-fontlock-rules))
 
 (provide 'erlang-ts-fontlock)
 ;;; erlang-ts-fontlock.el ends here

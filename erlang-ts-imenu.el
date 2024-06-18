@@ -10,6 +10,7 @@
 ;;; Code:
 
 (require 'treesit)
+
 (defun erlang-ts-imenu-function-node-p (node)
   "Predicate for NODE being a function."
   (let ((node-type (treesit-node-type node)))
@@ -60,14 +61,13 @@
         (rec-fields (cdr (treesit-node-children node t))))
     (concat "#" rec-name "{" (mapconcat 'erlang-ts-imenu-node-name rec-fields ", ") "}")))
 
-(defun erlang-ts-treesit-simple-imenu-settings-setup()
-  "Set up imenu for treesit."
-  (setq-local treesit-simple-imenu-settings
-              ;; List is in the form (CATEGORY NODE-MATCH-P-FUNCTION ? DISPLAY-FUNCTION)
-              `(("funs" erlang-ts-imenu-function-node-p nil erlang-ts-imenu-function-name)
-                ("specs" erlang-ts-imenu-spec-node-p nil erlang-ts-imenu-spec-name)
-                ("types" erlang-ts-imenu-type-node-p nil erlang-ts-imenu-type-name)
-                ("records" erlang-ts-imenu-record-node-p nil erlang-ts-imenu-record-name))))
+(defun erlang-ts-imenu-simple ()
+  "Set up simple imenu.
+List is in the form (CATEGORY NODE-MATCH-P-FUNCTION ? DISPLAY-FUNCTION)"
+  `(("funs" erlang-ts-imenu-function-node-p nil erlang-ts-imenu-function-name)
+    ("specs" erlang-ts-imenu-spec-node-p nil erlang-ts-imenu-spec-name)
+    ("types" erlang-ts-imenu-type-node-p nil erlang-ts-imenu-type-name)
+    ("records" erlang-ts-imenu-record-node-p nil erlang-ts-imenu-record-name)))
 
 (provide 'erlang-ts-imenu)
 ;;; erlang-ts-imenu.el ends here
