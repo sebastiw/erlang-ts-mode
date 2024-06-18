@@ -9,6 +9,7 @@
 (unless (featurep 'treesit)
   (error "Erlang-ts requires tree-sitter to be installed"))
 
+(add-to-list 'load-path (file-name-directory load-file-name))
 (require 'erlang-ts-mode-map nil t)
 (require 'erlang-ts-fontlock nil t)
 (require 'erlang-ts-indent nil t)
