@@ -10,23 +10,27 @@
 
 ;;; Code:
 
+;; check for treesit
 (require 'treesit)
 (unless (featurep 'treesit)
   (error "Erlang-ts requires tree-sitter to be installed"))
 
-(require 'erlang-ts-mode-map nil t)
-(require 'erlang-ts-fontlock nil t)
-(require 'erlang-ts-indent nil t)
-(require 'erlang-ts-imenu nil t)
-(require 'erlang-ts-defun nil t)
-(require 'erlang-ts-man nil t)
-
+;; install the parser
 (defvar treesit-language-source-alist)
 (unless (treesit-language-available-p 'erlang)
   (add-to-list
    'treesit-language-source-alist
    (cons 'erlang '("https://git.sr.ht/~massemanet/tree-sitter-erlang")))
   (treesit-install-language-grammar 'erlang))
+
+;; load our subsystems
+(require 'erlang-ts-flycheck nil t)
+(require 'erlang-ts-acer nil t)
+(require 'erlang-ts-mode-map nil t)
+(require 'erlang-ts-fontlock nil t)
+(require 'erlang-ts-indent nil t)
+(require 'erlang-ts-imenu nil t)
+(require 'erlang-ts-defun nil t)
 
 (defgroup erlang-ts nil
   "Tree-sitter for Erlang."
