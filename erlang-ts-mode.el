@@ -3,18 +3,23 @@
 ;;; The canonical `erlang-mode' is as of this writing 30 years
 ;;; old.  This is a from-scratch mode based on tree-sitter, xref, and
 ;;; autocomplete.
+;;;
+;;; Note that ‘erlang-ts-mode-map’, ‘erlang-ts-mode-syntax-table’,
+;;; ‘erlang-ts-mode-abbrev-table’, and ‘erlang-ts-mode-hook’ are
+;;; created by `define-derived-mode'.
+
 ;;; Code:
 
 (require 'treesit)
 (unless (featurep 'treesit)
   (error "Erlang-ts requires tree-sitter to be installed"))
 
-(add-to-list 'load-path (file-name-directory load-file-name))
 (require 'erlang-ts-mode-map nil t)
 (require 'erlang-ts-fontlock nil t)
 (require 'erlang-ts-indent nil t)
 (require 'erlang-ts-imenu nil t)
 (require 'erlang-ts-defun nil t)
+(require 'erlang-ts-man nil t)
 
 (defvar treesit-language-source-alist)
 (unless (treesit-language-available-p 'erlang)
@@ -31,6 +36,7 @@
 (defun erlang-ts-setup()
   "Initialize."
   (treesit-parser-create 'erlang)
+  (erlang-ts-mode-keys)
 
   ;; If ‘treesit-font-lock-settings’ is non-nil, set up fontification
   ;; and enable ‘font-lock-mode’.
@@ -57,15 +63,10 @@
 
   (treesit-major-mode-setup))
 
-(defvar erlang-ts-mode-abbrev-table
-  nil
-  "Abbrev table in use in erlang-ts-mode buffers.")
-
 ;;;###autoload
 (define-derived-mode erlang-ts-mode prog-mode "Erlang"
   "Major mode for editing Erlang, powered by tree-sitter."
   :group 'erlang-ts
-  :abbrev-table erlang-ts-mode-abbrev-table
   (when (treesit-ready-p 'erlang)
     (erlang-ts-setup)))
 
