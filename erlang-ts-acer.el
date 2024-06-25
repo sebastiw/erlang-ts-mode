@@ -1,6 +1,6 @@
-;;; acer --- Summary
+;;; erlang-ts-acer --- Summary
 ;;; Commentary:
-;;; Auto Complete for erlang.
+;;; Auto Complete + Ecks Ref for erlang.
 ;;;
 ;;; We want to use xref and auto-complete for erlang projects.  A
 ;;; project is; 1) the current file, 2) the other files in the same
@@ -16,55 +16,44 @@
 (require 'cl-generic)
 (require 'cl-lib)
 
-(defvar erlang-ts-man-dir (concat user-emacs-directory "cache/erlang_mode_man_pages/"))
-
-;; declare externals
-(declare-function erlang-ts-ts-args "erlang")
-(declare-function erlang-ts-ts-arity "erlang")
-(declare-function erlang-ts-ts-module "erlang")
-(declare-function erlang-ts-ts-fun "erlang")
-(declare-function erlang-ts-ts-thing "erlang")
-(declare-function erlang-ts-ts-import "erlang")
-
-;; global variables
-(defvar acer-path (file-name-directory load-file-name))
-(defvar acer-escript (concat acer-path "acer.escript"))
-(defvar acer-man-path (concat erlang-ts-man-dir "man/" "man3/"))
+(defvar-local etsa--path (file-name-directory (locate-library "erlang-ts-mode")))
+(defvar-local etsa--escript (concat etsa--path "etsa.escript"))
+(defvar-local etsa--man-path (concat erlang-ts-man-dir "man/" "man3/"))
 
 ;; OTP buffers
-(defvar acer-buffer-man (get-buffer-create "*acer-man*"))
-(defvar acer-buffer-bifs (get-buffer-create "*acer-bifs*"))
-(defvar acer-buffer-guards (get-buffer-create "*acer-guards*"))
-(defvar acer-buffer-words (get-buffer-create "*acer-words*"))
-(defvar acer-buffer-otp-erls (get-buffer-create "*acer-erls-otp*"))
-(defvar acer-buffer-otp-srcs (get-buffer-create "*acer-srcs-otp*"))
+(defvar-local etsa--buffer-man (get-buffer-create "*etsa--man*"))
+(defvar-local etsa--buffer-bifs (get-buffer-create "*etsa--bifs*"))
+(defvar-local etsa--buffer-guards (get-buffer-create "*etsa--guards*"))
+(defvar-local etsa--buffer-words (get-buffer-create "*etsa--words*"))
+(defvar-local etsa--buffer-otp-erls (get-buffer-create "*etsa--erls-otp*"))
+(defvar-local etsa--buffer-otp-srcs (get-buffer-create "*etsa--srcs-otp*"))
 
 ;; buffer local variables
-(defvar-local acer-project-name ())
+;; project name
+(defvar-local etsa--project-name ())
 
 ;; project buffers
-(defvar-local acer-buffer-erls ())
-(defvar-local acer-buffer-funs ())
-(defvar-local acer-buffer-srcs ())
+(defvar-local etsa--buffer-erls ())
+(defvar-local etsa--buffer-funs ())
+(defvar-local etsa--buffer-srcs ())
 
 ;;; We do most of our work in lists of this base struct
-(cl-defstruct acer-item mod fun arity line args file)
+(cl-defstruct etsa--item mod fun arity line args file)
 
 (defun erlang-ts-acer-init ()
-  "Init acer in current buffer."
-  (acer--project-name (buffer-file-name))
-  (setq acer-buffer-srcs (acer--create-buffer "paths")
-        acer-buffer-funs (acer--create-buffer "funs")
-        acer-buffer-erls (acer--create-buffer "erls"))
-  (acer--fill-initial)
-  (acer--init-ac)
-  (acer--init-xref)
-  (local-set-key (kbd "TAB") 'acer--tab))
+  "Init etsa in current buffer."
+  (etsa--project-name (buffer-file-name))
+  (setq etsa--buffer-srcs (etsa--create-buffer "paths")
+        etsa--buffer-funs (etsa--create-buffer "funs")
+        etsa--buffer-erls (etsa--create-buffer "erls"))
+  (etsa--fill-initial)
+  (etsa--init-ac)
+  (etsa--init-xref))
 
-(defun erlang-ts-acer-libs (&optional filename)
+(defun erlang-ts-aacer-libs (&optional filename)
   "All libs in the project that FILENAME belongs to."
   (let ((f (if filename filename (buffer-file-name))))
-    (pcase (split-string (acer--run-escript-str "libs" f))
+    (pcase (split-string (etsa--run-escript-str "libs" f))
       ((and paths (guard (string= "libs:" (car paths))))
        (cdr paths)))))
 
@@ -72,246 +61,246 @@
 ;; we're using TAB to do 3 things; indenting, replacing, and
 ;; completing.
 
-(defun acer--tab ()
+(defun erlang-ts-acer-tab ()
   "Interactive function (normally bound to TAB)."
   (interactive)
-  (or (acer--indent)
-      (acer--replace)
-      (acer--complete)))
+  (or (etsa--indent)
+      (etsa--replace)
+      (etsa--complete)))
 
-(defun acer--indent ()
+(defun etsa--indent ()
   "Try to indent, and return t if point moved."
   (not (= 0 (indent-according-to-mode))))
 
-(defun acer--replace ()
+(defun etsa--replace ()
   "Try to replace, and return t if replacement happened."
-  (acer-paren))
+  (etsa--paren))
 
-(defun acer--complete ()
+(defun etsa--complete ()
   "Try to complete."
   (auto-complete))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; auto-complete framework
 
-(defun acer--init-ac ()
+(defun etsa--init-ac ()
   "Initialize auto-complete."
   (auto-complete-mode)
   (setq ac-sources
-        '(acer-source-mfa
-          acer-source-mf
-          acer-source-fa
-          acer-source-f
-          acer-source-var
-          acer-source-macro
-          acer-source-rec)))
+        '(etsa--source-mfa
+          etsa--source-mf
+          etsa--source-fa
+          etsa--source-f
+          etsa--source-var
+          etsa--source-macro
+          etsa--source-rec)))
 
-(defvar acer-source-mfa
-  '((prefix . acer-prefix-mfa)
-    (candidates . acer-candidates-mfa))
+(defvar etsa--source-mfa
+  '((prefix . etsa--prefix-mfa)
+    (candidates . etsa--candidates-mfa))
   "Define source `mfa' - completes `m:f\('.")
 
-(defvar acer-source-mf
-  '((prefix . acer-prefix-mf)
-    (candidates . acer-candidates-mf))
+(defvar etsa--source-mf
+  '((prefix . etsa--prefix-mf)
+    (candidates . etsa--candidates-mf))
   "Define source `mf' - complete `m:f'.")
 
-(defvar acer-source-fa
-  '((prefix . acer-prefix-fa)
-    (candidates . acer-candidates-fa))
+(defvar etsa--source-fa
+  '((prefix . etsa--prefix-fa)
+    (candidates . etsa--candidates-fa))
   "Define source `fa' - complete `f\('.")
 
-(defvar acer-source-f
-  '((prefix . acer-prefix-f)
-    (candidates . acer-candidates-f))
+(defvar etsa--source-f
+  '((prefix . etsa--prefix-f)
+    (candidates . etsa--candidates-f))
   "Define source `f' - complete `frag'.")
 
-(defvar acer-source-var
-  '((prefix . acer-prefix-var)
-    (candidates . acer-candidates-var))
+(defvar etsa--source-var
+  '((prefix . etsa--prefix-var)
+    (candidates . etsa--candidates-var))
   "Define source `var' - complete `Var'.")
 
-(defvar acer-source-macro
-  '((prefix . acer-prefix-macro)
-    (candidates . acer-candidates-macro))
+(defvar etsa--source-macro
+  '((prefix . etsa--prefix-macro)
+    (candidates . etsa--candidates-macro))
   "Define source `macro' - complete `?m'.")
 
-(defvar acer-source-rec
-  '((prefix . acer-prefix-rec)
-    (candidates . acer-candidates-rec))
+(defvar etsa--source-rec
+  '((prefix . etsa--prefix-rec)
+    (candidates . etsa--candidates-rec))
   "Define source `rec' - complete `\#rec'.")
 
 ;; prefix finders
-(defun acer-prefix-mfa ()
+(defun etsa--prefix-mfa ()
   "Return start pos of thing if it is `m:f\('."
-  (acer--match-left "[a-z][a-zA-Z0-9_]*:[a-z][a-zA-Z0-9_]*("))
+  (etsa--match-left "[a-z][a-zA-Z0-9_]*:[a-z][a-zA-Z0-9_]*("))
 
-(defun acer-prefix-mf ()
+(defun etsa--prefix-mf ()
   "Return start pos of thing if it is `m:f'."
-  (acer--match-left "[a-z][a-zA-Z0-9_]*:[a-z][a-zA-Z0-9_]*"))
+  (etsa--match-left "[a-z][a-zA-Z0-9_]*:[a-z][a-zA-Z0-9_]*"))
 
-(defun acer-prefix-fa ()
+(defun etsa--prefix-fa ()
   "Return start pos of thing if it is `f\('."
-  (acer--match-left "[a-z][a-zA-Z0-9_]*("))
+  (etsa--match-left "[a-z][a-zA-Z0-9_]*("))
 
-(defun acer-prefix-f ()
+(defun etsa--prefix-f ()
   "Return start pos of thing if it is `f'."
-  (acer--match-left "[a-z][a-zA-Z0-9_]*"))
+  (etsa--match-left "[a-z][a-zA-Z0-9_]*"))
 
-(defun acer-prefix-var ()
+(defun etsa--prefix-var ()
   "Return start pos of thing if it is `Var'."
-  (acer--match-left "[A-Z][a-zA-Z0-9_]*"))
+  (etsa--match-left "[A-Z][a-zA-Z0-9_]*"))
 
-(defun acer-prefix-macro ()
+(defun etsa--prefix-macro ()
   "Return start pos of thing if it is `?m'."
-  (acer--match-left "\\?'?[a-zA-Z0-9_]*"))
+  (etsa--match-left "\\?'?[a-zA-Z0-9_]*"))
 
-(defun acer-prefix-rec ()
+(defun etsa--prefix-rec ()
   "Return start pos of thing if it is `\#rec'."
-  (acer--match-left "#'?[a-z][a-zA-Z0-9_]*"))
+  (etsa--match-left "#'?[a-z][a-zA-Z0-9_]*"))
 
 ;; candidate finders
-(defun acer-candidates-mfa ()
+(defun etsa--candidates-mfa ()
   "Get m:f( candidates."
-  (let* ((ai (acer--item-from-string-mfa ac-prefix))
-         (ais (acer--expand-mf-to-a ai)))
-    (mapcar #'acer--print-mfa ais)))
+  (let* ((ai (etsa--item-from-string-mfa ac-prefix))
+         (ais (etsa--expand-mf-to-a ai)))
+    (mapcar #'etsa--print-mfa ais)))
 
-(defun acer-candidates-mf ()
+(defun etsa--candidates-mf ()
   "Get m:f candidates."
-  (let* ((ai (acer--item-from-string-mf ac-prefix))
-         (ais (acer--expand-m-to-f ai)))
-    (mapcar #'acer--print-mf ais)))
+  (let* ((ai (etsa--item-from-string-mf ac-prefix))
+         (ais (etsa--expand-m-to-f ai)))
+    (mapcar #'etsa--print-mf ais)))
 
-(defun acer-candidates-fa ()
+(defun etsa--candidates-fa ()
   "Get f( candidates."
-  (let* ((ai (acer--item-from-string-fa ac-prefix))
-         (ais (acer--expand-f-to-a ai)))
-    (mapcar #'acer--print-fa ais)))
+  (let* ((ai (etsa--item-from-string-fa ac-prefix))
+         (ais (etsa--expand-f-to-a ai)))
+    (mapcar #'etsa--print-fa ais)))
 
-(defun acer-candidates-f ()
+(defun etsa--candidates-f ()
   "Get fragment (either mod or local fun) candidates."
-  (mapcar #'acer--print-f (acer--expand-nil ac-prefix)))
+  (mapcar #'etsa--print-f (etsa--expand-nil ac-prefix)))
 
-(defun acer-candidates-var ()
+(defun etsa--candidates-var ()
   "Get Var candidates."
-  (acer--get-vars ac-prefix))
+  (etsa--get-vars ac-prefix))
 
-(defun acer-candidates-macro ()
+(defun etsa--candidates-macro ()
   "Get ?MACRO candidates."
-  (acer--get-macros ac-prefix))
+  (etsa--get-macros ac-prefix))
 
-(defun acer-candidates-rec ()
+(defun etsa--candidates-rec ()
   "Get \#rec candidates."
-  (mapcar (lambda(m) (concat "#" m)) (acer--get-recs ac-prefix)))
+  (mapcar (lambda(m) (concat "#" m)) (etsa--get-recs ac-prefix)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; xref framework
 
-(defun acer--init-xref ()
+(defun etsa--init-xref ()
   "Initialize xref."
-  (add-hook 'xref-backend-functions #'acer--xref-backend nil t))
+  (add-hook 'xref-backend-functions #'etsa--xref-backend nil t))
 
-(defun acer--xref-backend ()
+(defun etsa--xref-backend ()
   "Declare xref backend."
-  'acer)
+  'etsa)
 
-(cl-defmethod xref-backend-identifier-at-point ((_backend (eql acer)))
-  "Return acer-item for item at point."
+(cl-defmethod xref-backend-identifier-at-point ((_backend (eql etsa)))
+  "Return etsa--item for item at point."
   (pcase (erlang-get-identifier-at-point)
     (`(qualified-function ,m ,f ,a)
-     (acer--make-item m f a))
+     (etsa--make-item m f a))
     ((and `(nil ,m ,f ,a) (guard (string= m (erlang-get-module))))
-     (acer--make-item nil f a))
+     (etsa--make-item nil f a))
     (`(nil ,m ,f ,a)
-     (acer--make-item m f a))))
+     (etsa--make-item m f a))))
 
-(cl-defmethod xref-backend-definitions ((_backend (eql acer)) ai)
-  "List of `xref-item' for `acer-item' AI."
-  (mapcar #'acer--ai-to-xi (acer--expand-definitions ai)))
+(cl-defmethod xref-backend-definitions ((_backend (eql etsa)) ai)
+  "List of `xref-item' for `etsa--item' AI."
+  (mapcar #'etsa--ai-to-xi (etsa--expand-definitions ai)))
 
-(cl-defmethod xref-backend-apropos ((_backend (eql acer)) frag)
+(cl-defmethod xref-backend-apropos ((_backend (eql etsa)) frag)
   "List of `xref-item' fragment FRAG."
-  (mapcar #'acer--ai-to-xi (acer--expand-nil frag)))
+  (mapcar #'etsa--ai-to-xi (etsa--expand-nil frag)))
 
-(cl-defmethod xref-backend-identifier-completion-table ((_backend (eql acer)))
+(cl-defmethod xref-backend-identifier-completion-table ((_backend (eql etsa)))
   "A completion table."
   ())
 
-(defun acer--ai-to-xi (ai)
-  "Construct `xref-item' from `acer-item' AI."
-  (let* ((m (acer-item-mod ai))
+(defun etsa--ai-to-xi (ai)
+  "Construct `xref-item' from `etsa--item' AI."
+  (let* ((m (etsa--item-mod ai))
          (mod (when m (concat m ":")))
-         (fun (acer-item-fun ai))
-         (arity (acer-item-arity ai))
-         (file (acer-item-file ai))
-         (line (string-to-number (acer-item-line ai)))
+         (fun (etsa--item-fun ai))
+         (arity (etsa--item-arity ai))
+         (file (etsa--item-file ai))
+         (line (string-to-number (etsa--item-line ai)))
          (summary (concat mod fun "/" arity))
          (location (xref-make-file-location file line 0)))
     (xref-make summary location)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; expanders. these read from the *acer-* buffers.
-;; They all map `acer-item' -> list of `acer-item'.
+;; expanders. these read from the *etsa--* buffers.
+;; They all map `etsa--item' -> list of `etsa--item'.
 
-(defun acer--expand-definitions (ai)
-  "Return list of `acer-item' completing `acer-item' AI."
-  (let ((mod (acer-item-mod ai))
-        (fun (acer-item-fun ai)))
+(defun etsa--expand-definitions (ai)
+  "Return list of `etsa--item' completing `etsa--item' AI."
+  (let ((mod (etsa--item-mod ai))
+        (fun (etsa--item-fun ai)))
     (if mod
-        (acer--expand-mf-to-a ai)
-      (acer--expand-f-to-a ai))))
+        (etsa--expand-mf-to-a ai)
+      (etsa--expand-f-to-a ai))))
 
-(defun acer--expand-mf-to-a (ai)
-  "Return list of `acer-item' by completing AI.
+(defun etsa--expand-mf-to-a (ai)
+  "Return list of `etsa--item' by completing AI.
 AI.mod and AI.fun should be completed."
-  (let ((ai (car (acer--expand-m-to-m ai))))
+  (let ((ai (car (etsa--expand-m-to-m ai))))
     (when ai
-      (let* ((mod (acer-item-mod ai))
-             (fun (acer-item-fun ai))
-             (arity (acer-item-arity ai))
-             (file (acer-item-file ai))
+      (let* ((mod (etsa--item-mod ai))
+             (fun (etsa--item-fun ai))
+             (arity (etsa--item-arity ai))
+             (file (etsa--item-file ai))
              (mfa (concat mod ":" fun "/" arity))
-             (buffs (list acer-buffer-erls acer-buffer-otp-erls))
+             (buffs (list etsa--buffer-erls etsa--buffer-otp-erls))
              (ais))
-        (acer--fill-funs ai)
-        (with-current-buffer acer-buffer-funs
+        (etsa--fill-funs ai)
+        (with-current-buffer etsa--buffer-funs
           (goto-char 1)
           (while (re-search-forward mfa nil t)
-            (push (acer--item-from-line-funs) ais)))
-        (mapcar (lambda (aii) (acer--item-merge aii ai)) (nreverse ais))))))
+            (push (etsa--item-from-line-funs) ais)))
+        (mapcar (lambda (aii) (etsa--item-merge aii ai)) (nreverse ais))))))
 
-(defun acer--expand-m-to-f (ai)
-  "Return list of `acer-item' that completes M:F from AI.
+(defun etsa--expand-m-to-f (ai)
+  "Return list of `etsa--item' that completes M:F from AI.
 AI.mod should be completed."
-  (let ((ai (car (acer--expand-m-to-m ai))))
+  (let ((ai (car (etsa--expand-m-to-m ai))))
     (when ai
-      (let* ((mod (acer-item-mod ai))
-             (fun (acer-item-fun ai))
-             (file (acer-item-file ai))
+      (let* ((mod (etsa--item-mod ai))
+             (fun (etsa--item-fun ai))
+             (file (etsa--item-file ai))
              (mf (concat mod ":" fun))
              (ais))
-        (acer--fill-funs ai)
-        (with-current-buffer acer-buffer-funs
+        (etsa--fill-funs ai)
+        (with-current-buffer etsa--buffer-funs
           (goto-char 1)
           (while (re-search-forward mf nil t)
-            (push (acer--item-from-line-funs) ais)))
-        (mapcar (lambda (aii) (acer--item-merge aii ai)) (nreverse ais))))))
+            (push (etsa--item-from-line-funs) ais)))
+        (mapcar (lambda (aii) (etsa--item-merge aii ai)) (nreverse ais))))))
 
-(defun acer--expand-f-to-a (ai)
-  "Return list of `acer-item' with things that complete AI.
+(defun etsa--expand-f-to-a (ai)
+  "Return list of `etsa--item' with things that complete AI.
 AI.mod is ignored, AI.fun is completed."
-  (append (acer--expand-f-to-a-local ai)
-          (acer--expand-f-to-a-imports ai)
-          (acer--expand-f-to-a-bifs ai)))
+  (append (etsa--expand-f-to-a-local ai)
+          (etsa--expand-f-to-a-imports ai)
+          (etsa--expand-f-to-a-bifs ai)))
 
-(defun acer--expand-f-to-a-local (ai)
-  "Return list of `acer-item' by completing AI in local buffer.
+(defun etsa--expand-f-to-a-local (ai)
+  "Return list of `etsa--item' by completing AI in local buffer.
 AI.mod is ignored, AI.fun should be completed."
   (let ((file (buffer-file-name))
         (mod (erlang-get-module))
-        (fun (acer-item-fun ai))
-        (arity (acer-item-arity ai))
+        (fun (etsa--item-fun ai))
+        (arity (etsa--item-arity ai))
         (hit))
     (save-excursion
       (goto-char 1)
@@ -326,43 +315,43 @@ AI.mod is ignored, AI.fun should be completed."
           (when (and args
                      (equal f fun)
                      (if arity (equal a arity) t))
-            (setq hit (acer--make-item mod f a line args file))))))
+            (setq hit (etsa--make-item mod f a line args file))))))
     (when hit (list hit))))
 
-(defun acer--expand-f-to-a-imports (ai)
-  "Return list of `acer-item' where AI.fun is imported.
+(defun etsa--expand-f-to-a-imports (ai)
+  "Return list of `etsa--item' where AI.fun is imported.
 AI.fun should be completed.  AI.mod is ignored."
   ()) ;; TODO: placeholder.
 
-(defun acer--expand-f-to-a-bifs (ai)
-  "Return list of `acer-item' where AI.fun is autoimported from `erlang'.
+(defun etsa--expand-f-to-a-bifs (ai)
+  "Return list of `etsa--item' where AI.fun is autoimported from `erlang'.
 AI.fun should be completed.  AI.mod is ignored."
-  (acer--expand-mf-to-a (acer--item-set 'mod "erlang" ai)))
+  (etsa--expand-mf-to-a (etsa--item-set 'mod "erlang" ai)))
 
-(defun acer--expand-nil (frag)
-  "Return list of `acer-item' with things that complete string FRAG.
+(defun etsa--expand-nil (frag)
+  "Return list of `etsa--item' with things that complete string FRAG.
 We try X = module and X = local function."
-  (append (acer--expand-nil-to-m (acer--make-item frag))
-          (acer--expand-nil-to-f (acer--make-item nil frag))))
+  (append (etsa--expand-nil-to-m (etsa--make-item frag))
+          (etsa--expand-nil-to-f (etsa--make-item nil frag))))
 
-(defun acer--expand-nil-to-m (ai)
-  "Return list of `acer-item' by completing AI.mod."
-  (append (acer--expand-nil-to-m-in-buffer ai acer-buffer-otp-erls)
-          (acer--expand-nil-to-m-in-buffer ai acer-buffer-erls)))
+(defun etsa--expand-nil-to-m (ai)
+  "Return list of `etsa--item' by completing AI.mod."
+  (append (etsa--expand-nil-to-m-in-buffer ai etsa--buffer-otp-erls)
+          (etsa--expand-nil-to-m-in-buffer ai etsa--buffer-erls)))
 
-(defun acer--expand-nil-to-f (ai)
-  "Return list of `acer-item' with things that complete AI.
+(defun etsa--expand-nil-to-f (ai)
+  "Return list of `etsa--item' with things that complete AI.
 AI.mod is ignored."
-  (append (acer--expand-nil-to-f-local ai)
-          (acer--expand-nil-to-f-imports ai)
-          (acer--expand-nil-to-f-bifs ai)))
+  (append (etsa--expand-nil-to-f-local ai)
+          (etsa--expand-nil-to-f-imports ai)
+          (etsa--expand-nil-to-f-bifs ai)))
 
-(defun acer--expand-nil-to-f-local (ai)
-  "Return list of `acer-item' by completing AI in local buffer.
+(defun etsa--expand-nil-to-f-local (ai)
+  "Return list of `etsa--item' by completing AI in local buffer.
 AI.mod is ignored,"
   (let ((file (buffer-file-name))
         (mod (erlang-get-module))
-        (fun (acer-item-fun ai))
+        (fun (etsa--item-fun ai))
         (ais))
     (save-excursion
       (goto-char 1)
@@ -375,146 +364,146 @@ AI.mod is ignored,"
           (end-of-line)
           (when (and args
                      (string-prefix-p fun f))
-            (push (acer--make-item mod f a line args file) ais)))))
+            (push (etsa--make-item mod f a line args file) ais)))))
     (nreverse ais)))
 
-(defun acer--expand-nil-to-f-imports (ai)
-  "Return list of `acer-item' where AI.fun is imported."
+(defun etsa--expand-nil-to-f-imports (ai)
+  "Return list of `etsa--item' where AI.fun is imported."
   ()) ;; TODO: placeholder.
 
-(defun acer--expand-nil-to-f-bifs (ai)
-  "Return list of `acer-item' where AI.fun is autoimported from `erlang'."
-  (let ((patt (concat "^" (acer-item-fun ai)))
+(defun etsa--expand-nil-to-f-bifs (ai)
+  "Return list of `etsa--item' where AI.fun is autoimported from `erlang'."
+  (let ((patt (concat "^" (etsa--item-fun ai)))
         (ais))
-    (with-current-buffer acer-buffer-bifs
+    (with-current-buffer etsa--buffer-bifs
       (goto-char 1)
       (while (re-search-forward patt nil t)
-        (push (acer--make-item "erlang" (acer--line-to-string t)) ais)))
-    (mapcan #'acer--expand-m-to-f ais)))
+        (push (etsa--make-item "erlang" (etsa--line-to-string t)) ais)))
+    (mapcan #'etsa--expand-m-to-f ais)))
 
-(defun acer--expand-m-to-m (ai)
-  "Return list of `acer-item'.
+(defun etsa--expand-m-to-m (ai)
+  "Return list of `etsa--item'.
 AI.mod should be completed."
-  (append (acer--expand-m-to-m-in-buffer ai acer-buffer-otp-erls)
-          (acer--expand-m-to-m-in-buffer ai acer-buffer-erls)))
+  (append (etsa--expand-m-to-m-in-buffer ai etsa--buffer-otp-erls)
+          (etsa--expand-m-to-m-in-buffer ai etsa--buffer-erls)))
 
-(defun acer--expand-nil-to-m-in-buffer (ai buffer)
+(defun etsa--expand-nil-to-m-in-buffer (ai buffer)
   "Expand AI as module in BUFFER."
   (let ((case-fold-search nil)
-        (pattern (concat "^" (acer-item-mod ai)))
+        (pattern (concat "^" (etsa--item-mod ai)))
         (ais))
     (with-current-buffer buffer
       (goto-char 1)
       (while (re-search-forward pattern nil t)
-        (push (acer--item-from-line-erls) ais)))
+        (push (etsa--item-from-line-erls) ais)))
     (nreverse ais)))
 
-(defun acer--expand-m-to-m-in-buffer (ai buffer)
+(defun etsa--expand-m-to-m-in-buffer (ai buffer)
   "Expand AI as module in BUFFER.
 AI.mod should be completed."
   (let ((case-fold-search nil)
-        (pattern (concat "^" (acer-item-mod ai) "=>")))
+        (pattern (concat "^" (etsa--item-mod ai) "=>")))
     (with-current-buffer buffer
       (goto-char 1)
       (when (re-search-forward pattern nil t)
-        (list (acer--item-merge ai (acer--item-from-line-erls)))))))
+        (list (etsa--item-merge ai (etsa--item-from-line-erls)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; fillers. These write to the *acer-* buffers.
+;; fillers. These write to the *etsa--* buffers.
 
-(defun acer--project-name (filename)
+(defun etsa--project-name (filename)
   "Use FILENAME to set project name."
-  (unless acer-project-name
-    (setq acer-project-name (acer--run-escript-str "name" filename))))
+  (unless etsa--project-name
+    (setq etsa--project-name (etsa--run-escript-str "name" filename))))
 
-(defun acer--fill-initial ()
+(defun etsa--fill-initial ()
   "Fills buffers."
-  (acer--fill-man)
-  (acer--fill-bifs)
-  (acer--fill-guards)
-  (acer--fill-words)
-  (acer--fill-otp-srcs)
-  (acer--fill-project-srcs)
-  (acer--fill-erls acer-buffer-otp-srcs acer-buffer-otp-erls)
-  (acer--fill-erls acer-buffer-srcs acer-buffer-erls))
+  (etsa--fill-man)
+  (etsa--fill-bifs)
+  (etsa--fill-guards)
+  (etsa--fill-words)
+  (etsa--fill-otp-srcs)
+  (etsa--fill-project-srcs)
+  (etsa--fill-erls etsa--buffer-otp-srcs etsa--buffer-otp-erls)
+  (etsa--fill-erls etsa--buffer-srcs etsa--buffer-erls))
 
-(defun acer--fill-man ()
+(defun etsa--fill-man ()
   "Populate paths to all OTP man files."
-  (with-current-buffer acer-buffer-man
+  (with-current-buffer etsa--buffer-man
     (unless (< 0 (buffer-size))
-      (acer--run-escript "man" acer-man-path))))
+      (etsa--run-escript "man" etsa--man-path))))
 
-(defun acer--fill-otp-srcs ()
+(defun etsa--fill-otp-srcs ()
   "Populate paths to all directories containing project erls."
-  (with-current-buffer acer-buffer-otp-srcs
+  (with-current-buffer etsa--buffer-otp-srcs
     (unless (< 0 (buffer-size))
-      (acer--run-escript "srcs" "otp"))))
+      (etsa--run-escript "srcs" "otp"))))
 
-(defun acer--fill-project-srcs ()
+(defun etsa--fill-project-srcs ()
   "Populate paths to all directories containing project erls."
   (let ((file (buffer-file-name)))
-    (with-current-buffer acer-buffer-srcs
+    (with-current-buffer etsa--buffer-srcs
       (unless (< 0 (buffer-size))
-        (acer--run-escript "srcs" file)))))
+        (etsa--run-escript "srcs" file)))))
 
-(defun acer--fill-erls (pbuff buff)
+(defun etsa--fill-erls (pbuff buff)
   "Populate BUFF with paths to all erl files with paths from PBUFF."
-  (let ((paths (acer--paths pbuff)))
+  (let ((paths (etsa--paths pbuff)))
     (with-current-buffer buff
       (unless (< 0 (buffer-size))
-        (mapc (lambda(p) (acer--run-escript "erls" p)) paths)))))
+        (mapc (lambda(p) (etsa--run-escript "erls" p)) paths)))))
 
-(defun acer--fill-funs (ai)
+(defun etsa--fill-funs (ai)
   "Populate all AI.mod's exported functions as per AI.file."
-  (let ((mod (acer-item-mod ai))
-        (file (acer-item-file ai)))
-    (unless (acer--has-funs-p mod)
-      (with-current-buffer acer-buffer-funs
-        (acer--run-escript "funs" file)))))
+  (let ((mod (etsa--item-mod ai))
+        (file (etsa--item-file ai)))
+    (unless (etsa--has-funs-p mod)
+      (with-current-buffer etsa--buffer-funs
+        (etsa--run-escript "funs" file)))))
 
-(defun acer--fill-bifs ()
+(defun etsa--fill-bifs ()
   "Populate bifs buffer."
-  (with-current-buffer acer-buffer-bifs
-    (acer--run-escript "bifs")))
+  (with-current-buffer etsa--buffer-bifs
+    (etsa--run-escript "bifs")))
 
-(defun acer--fill-guards ()
+(defun etsa--fill-guards ()
   "Populate guards buffer."
-  (with-current-buffer acer-buffer-guards
-    (acer--run-escript "guards")))
+  (with-current-buffer etsa--buffer-guards
+    (etsa--run-escript "guards")))
 
-(defun acer--fill-words ()
+(defun etsa--fill-words ()
   "Populate words buffer."
-  (with-current-buffer acer-buffer-words
-    (acer--run-escript "words")))
+  (with-current-buffer etsa--buffer-words
+    (etsa--run-escript "words")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; pretty-printers
 
-(defun acer--print-mfa (ai)
-  "Map `acer-item' AI to m:f(as) string."
-  (let ((mod (acer-item-mod ai))
-        (fun (acer-item-fun ai))
-        (args (acer-item-args ai)))
+(defun etsa--print-mfa (ai)
+  "Map `etsa--item' AI to m:f(as) string."
+  (let ((mod (etsa--item-mod ai))
+        (fun (etsa--item-fun ai))
+        (args (etsa--item-args ai)))
     (concat mod ":" fun "(" args ")")))
 
-(defun acer--print-mf (ai)
-  "Map `acer-item' AI to m:f( string."
-  (let ((mod (acer-item-mod ai))
-        (fun (acer-item-fun ai)))
+(defun etsa--print-mf (ai)
+  "Map `etsa--item' AI to m:f( string."
+  (let ((mod (etsa--item-mod ai))
+        (fun (etsa--item-fun ai)))
     (concat mod ":" fun "(")))
 
-(defun acer--print-fa (ai)
-  "Map `acer-item' AI to f(as) string."
-  (let ((fun (acer-item-fun ai))
-        (args (acer-item-args ai)))
+(defun etsa--print-fa (ai)
+  "Map `etsa--item' AI to f(as) string."
+  (let ((fun (etsa--item-fun ai))
+        (args (etsa--item-args ai)))
     (concat fun "(" args ")")))
 
-(defun acer--print-f (ai)
-  "Map `acer-item' AI to m: or f(as) string."
-  (let ((mod (acer-item-mod ai))
-        (fun (acer-item-fun ai))
-        (ari (acer-item-arity ai))
-        (args (acer-item-args ai)))
+(defun etsa--print-f (ai)
+  "Map `etsa--item' AI to m: or f(as) string."
+  (let ((mod (etsa--item-mod ai))
+        (fun (etsa--item-fun ai))
+        (ari (etsa--item-arity ai))
+        (args (etsa--item-args ai)))
     (cond
      ((and mod (not fun)) (concat mod ":"))
      ((and fun args) (concat fun "(" args ")"))
@@ -524,21 +513,21 @@ AI.mod should be completed."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; buffer helpers
 
-(defun acer--create-buffer (frag)
-  "Create acer buffer named by FRAG."
-  (get-buffer-create (concat "*acer-" frag "-" acer-project-name "*")))
+(defun etsa--create-buffer (frag)
+  "Create etsa buffer named by FRAG."
+  (get-buffer-create (concat "*etsa--" frag "-" etsa--project-name "*")))
 
-(defun acer--has-funs-p (mod)
+(defun etsa--has-funs-p (mod)
   "Predicate for functions from MOD."
-  (with-current-buffer acer-buffer-funs
-    (acer--has-info-p (concat "^" mod ":"))))
+  (with-current-buffer etsa--buffer-funs
+    (etsa--has-info-p (concat "^" mod ":"))))
 
-(defun acer--has-info-p (pattern)
+(defun etsa--has-info-p (pattern)
   "Predicate for PATTERN in current buffer."
   (goto-char 1)
   (re-search-forward pattern nil t))
 
-(defun acer--line-to-string (dir)
+(defun etsa--line-to-string (dir)
   "Return text from current buffer as a string.
 Select between bol and point (if DIR is `left'), point and eol (if
 DIR is `right'), or bol and eol (otherwise)."
@@ -546,7 +535,7 @@ DIR is `right'), or bol and eol (otherwise)."
         (end (if (equal dir 'left) (point) (line-end-position))))
     (buffer-substring-no-properties beg end)))
 
-(defun acer--match-left (pattern)
+(defun etsa--match-left (pattern)
   "Return beginning of match, if PATTERN precedes point."
   (let ((case-fold-search nil)
         (beg (line-beginning-position))
@@ -561,19 +550,19 @@ DIR is `right'), or bol and eol (otherwise)."
             (unless (= ?: zw)
               p)))))))
 
-(defun acer--run-escript (subcommand &optional args)
+(defun etsa--run-escript (subcommand &optional args)
   "Fill current buffer by running escript with SUBCOMMAND and ARGS."
   (goto-char (point-max))
-  (let ((cmd (concat acer-escript " " subcommand " " args)))
+  (let ((cmd (concat etsa--escript " " subcommand " " args)))
     (unless (= 0 (call-process-shell-command cmd nil (list (current-buffer) nil)))
       (error "Shell comand failed: %s" cmd))))
 
-(defun acer--run-escript-str (subcommand &optional args)
+(defun etsa--run-escript-str (subcommand &optional args)
   "Return result of running escript with SUBCOMMAND and ARGS as string."
-  (let ((cmd (concat acer-escript " " subcommand " " args)))
+  (let ((cmd (concat etsa--escript " " subcommand " " args)))
     (string-trim (shell-command-to-string cmd))))
 
-(defun acer--paths (buff)
+(defun etsa--paths (buff)
   "Return, as a list of string, paths from BUFF."
   (let ((paths))
     (with-current-buffer buff
@@ -581,118 +570,118 @@ DIR is `right'), or bol and eol (otherwise)."
       (forward-line)
       (while (looking-at "^  /")
         (forward-char 2)
-        (push (acer--line-to-string 'right) paths)
+        (push (etsa--line-to-string 'right) paths)
         (forward-line)))
     paths))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; constuctors, setter, getter, merger for our struct
 
-(defun acer--item-from-string-mfa (str)
-  "Return `acer-item' from `m:f\(' STR."
+(defun etsa--item-from-string-mfa (str)
+  "Return `etsa--item' from `m:f\(' STR."
   (pcase (split-string str "[:()]" t)
     (`(,m ,f)
-     (acer--make-item m f))))
+     (etsa--make-item m f))))
 
-(defun acer--item-from-string-mf (str)
-  "Return `acer-item' from `m:f' STR."
+(defun etsa--item-from-string-mf (str)
+  "Return `etsa--item' from `m:f' STR."
   (pcase (split-string str "[:]" t)
     (`(,m ,f)
-     (acer--make-item m f))))
+     (etsa--make-item m f))))
 
-(defun acer--item-from-string-fa (str)
+(defun etsa--item-from-string-fa (str)
   "Return `avcer-item' from `f\(' STR."
   (pcase (split-string str "[()]" t)
     (`(,f)
-     (acer--make-item nil f))))
+     (etsa--make-item nil f))))
 
-(defun acer--item-from-line-erls ()
-  "Make `acer-item' from current line."
-  (let ((str (acer--line-to-string t)))
+(defun etsa--item-from-line-erls ()
+  "Make `etsa--item' from current line."
+  (let ((str (etsa--line-to-string t)))
     (pcase (split-string str "=>" t)
       (`(,m ,file)
-       (acer--make-item m nil nil nil nil file)))))
+       (etsa--make-item m nil nil nil nil file)))))
 
-(defun acer--item-from-line-funs ()
-  "Make `acer-item' from current line."
-  (let ((str (acer--line-to-string t)))
+(defun etsa--item-from-line-funs ()
+  "Make `etsa--item' from current line."
+  (let ((str (etsa--line-to-string t)))
     (pcase (split-string str "[:/()]" t)
       (`(,m ,f "0" ,l)
-       (acer--make-item m f "0" l))
+       (etsa--make-item m f "0" l))
       (`(,m ,f ,a ,l ,as)
-       (acer--make-item m f a l as)))))
+       (etsa--make-item m f a l as)))))
 
-(defun acer--items-from-imports ()
-  "Imports as list of `acer-item'."
+(defun etsa--items-from-imports ()
+  "Imports as list of `etsa--item'."
   (seq-reduce
    (lambda (a v)
      (let ((cv (car v)))
        (seq-reduce
-        (lambda (b w) (cons (acer--make-item cv (car w) (cdr w)) b))
+        (lambda (b w) (cons (etsa--make-item cv (car w) (cdr w)) b))
         (cdr v)
         a)))
    (erlang-get-import)
    ()))
 
-(defun acer--make-item (m &optional f a l as file)
-  "Construct an `acer-item' from components.
+(defun etsa--make-item (m &optional f a l as file)
+  "Construct an `etsa--item' from components.
 M, F, A, L, AS, FILE.  All are nullable strings."
   (let* ((a (when a (if (numberp a) (number-to-string a) a)))
          (l (when l (if (numberp l) (number-to-string l) l))))
-    (make-acer-item :mod m :fun f :arity a :line l :args as :file file)))
+    (make-etsa--item :mod m :fun f :arity a :line l :args as :file file)))
 
-(defun acer--item-merge (iai dai)
+(defun etsa--item-merge (iai dai)
   "Merge IAI and DAI by copying DAI.k -> IAI.k if IAI.k == nil."
-  (let ((keys (mapcar #'car (cdr (cl-struct-slot-info 'acer-item))))
-        (merger (lambda (acc key) (acer--item-merge-k key acc dai))))
+  (let ((keys (mapcar #'car (cdr (cl-struct-slot-info 'etsa--item))))
+        (merger (lambda (acc key) (etsa--item-merge-k key acc dai))))
     (cl-reduce merger keys :initial-value iai)))
 
-(defun acer--item-merge-k (key iai dai)
+(defun etsa--item-merge-k (key iai dai)
   "Copy DAI.KEY -> IAI.KEY if IAI.KEY == nil."
-  (if (acer--item-get key iai)
+  (if (etsa--item-get key iai)
       iai
-    (acer--item-set key (acer--item-get key dai) iai)))
+    (etsa--item-set key (etsa--item-get key dai) iai)))
 
-(defun acer--item-set (key val ai)
-  "Set KEY to VAL in `acer-item' AI."
-  (setf (cl-struct-slot-value 'acer-item key ai) val)
+(defun etsa--item-set (key val ai)
+  "Set KEY to VAL in `etsa--item' AI."
+  (setf (cl-struct-slot-value 'etsa--item key ai) val)
   ai)
 
-(defun acer--item-get (k ai)
-  "Get value of field K in `acer-item' AI."
-  (cl-struct-slot-value 'acer-item k ai))
+(defun etsa--item-get (k ai)
+  "Get value of field K in `etsa--item' AI."
+  (cl-struct-slot-value 'etsa--item k ai))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; paren matching
 
-(defun acer-paren()
+(defun etsa--paren()
   "Replace current sequence of close-parens with a correct such sequence."
   (interactive)
-  (let ((group (acer--paren-group)))
+  (let ((group (etsa--paren-group)))
     (when group
       (let* ((aptr (car group))
              (bptr (cdr group))
              (curr (buffer-substring-no-properties aptr bptr))
-             (replace (acer--paren-replacement aptr bptr)))
+             (replace (etsa--paren-replacement aptr bptr)))
         (when (and replace (not (string= replace curr)))
           (delete-region aptr bptr)
           (not (insert replace)))))))
 
-(defun acer--paren-replacement (aptr bptr)
+(defun etsa--paren-replacement (aptr bptr)
   "Calculate a string of close-parens.
 If put between APTR and BPTR,
 the sequence would balance parens in current form."
   (when (not (= aptr bptr))
-    (let* ((astack (acer--paren-collect-parens (acer--form-prev) aptr))
-           (bstack (acer--paren-collect-parens bptr (acer--form-next)))
+    (let* ((astack (etsa--paren-collect-parens (etsa--form-prev) aptr))
+           (bstack (etsa--paren-collect-parens bptr (etsa--form-next)))
            (astack (nreverse astack)))
-      (while (acer--paren-pair-p (car bstack) (car astack))
+      (while (etsa--paren-pair-p (car bstack) (car astack))
         (pop bstack)
         (pop astack))
       (unless bstack
-        (acer--paren-replacement-string astack)))))
+        (etsa--paren-replacement-string astack)))))
 
-(defun acer--paren-collect-parens (beg end)
+(defun etsa--paren-collect-parens (beg end)
   "Collect parens (as list of char) between BEG and END.
 Balanced pairs are removed."
   (let ((stack))
@@ -700,20 +689,20 @@ Balanced pairs are removed."
       (goto-char beg)
       (while (re-search-forward "[]{}()[]" end t)
         (let ((p (char-before)))
-          (if (acer--paren-pair-p p (car stack))
+          (if (etsa--paren-pair-p p (car stack))
               (pop stack)
             (push  p stack)))))
     stack))
 
-(defun acer--paren-replacement-string (stack)
+(defun etsa--paren-replacement-string (stack)
   "Construct replacement string from STACK."
-  (concat (mapcar #'acer--paren-matching (nreverse stack))))
+  (concat (mapcar #'etsa--paren-matching (nreverse stack))))
 
-(defun acer--paren-pair-p (char1 char2)
+(defun etsa--paren-pair-p (char1 char2)
   "Is CHAR1 and CHAR2 a paren pair."
-  (and char1 (= char1 (acer--paren-matching char2))))
+  (and char1 (= char1 (etsa--paren-matching char2))))
 
-(defun acer--paren-matching (char)
+(defun etsa--paren-matching (char)
   "If CHAR is a paren, return the matching paren.
 Otherwise, return zero."
   (pcase char
@@ -725,17 +714,17 @@ Otherwise, return zero."
     (?\] ?\[)
     (_ 0)))
 
-(defun acer--paren-group ()
+(defun etsa--paren-group ()
   "If point is in a close-paren group, return (BEG . END).
 BEG and END are the starting and ending positions of the group."
   (save-excursion
     (with-restriction (line-beginning-position) (line-end-position)
       (goto-char 1)
       (let ((ptr (point))
-            (p (acer--get-ptr-fwd "[]})]+")))
+            (p (etsa--get-ptr-fwd "[]})]+")))
         (while (and p (< (match-end 0) ptr))
           (goto-char (match-end 0))
-          (setq p (acer--get-ptr-fwd "[]})]+")))
+          (setq p (etsa--get-ptr-fwd "[]})]+")))
         (when (and p
                    (<= (match-beginning 0) ptr)
                    (<= ptr (match-end 0)))
@@ -744,72 +733,72 @@ BEG and END are the starting and ending positions of the group."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; get stuff from current buffer
 
-(defun acer--get-vars (prefix)
+(defun etsa--get-vars (prefix)
   "All varibles matching PREFIX as list of string.
 Restricted from beginning of form to beginning of PREFIX."
-  (let ((beg (acer--form-prev))
+  (let ((beg (etsa--form-prev))
         (vars))
     (save-excursion
       (re-search-backward (concat prefix "\\="))
       (with-restriction beg (point)
         (goto-char 1)
-        (while (acer--get-ptr-fwd "[A-Z][A-Za-z0-9_]*")
+        (while (etsa--get-ptr-fwd "[A-Z][A-Za-z0-9_]*")
           (goto-char (match-end 0))
           (push (match-string-no-properties 0) vars))))
     (cl-remove-duplicates (sort vars 'string<) :test 'string=)))
 
-(defun acer--get-macros (prefix)
+(defun etsa--get-macros (prefix)
   "All macros matching PREFIX as list of string."
   (let* ((frag (substring prefix 1))
          (patt (concat "^-define *( *\\(" frag "[^ ,(]*\\)")))
-    (mapcar (lambda(m) (concat "?" m)) (acer--get-frags patt))))
+    (mapcar (lambda(m) (concat "?" m)) (etsa--get-frags patt))))
 
-(defun acer--get-recs (prefix)
+(defun etsa--get-recs (prefix)
   "All  matching PREFIX as list of string."
   (let* ((frag (substring prefix 1))
          (patt (concat "^-record *( *\\(" frag "[^ ,(]*\\)")))
-    (mapcar (lambda(m) (concat "#" m)) (acer--get-frags patt))))
+    (mapcar (lambda(m) (concat "#" m)) (etsa--get-frags patt))))
 
-(defun acer--get-frags (patt)
+(defun etsa--get-frags (patt)
   "Return all things matching PATT as list of string."
   (let ((frags))
     (save-excursion
       (goto-char 1)
-      (while (acer--get-ptr-fwd patt)
+      (while (etsa--get-ptr-fwd patt)
         (push (match-string-no-properties 1) frags)
         (goto-char (match-end 1))))
     frags))
 
-(defun acer--form-prev ()
+(defun etsa--form-prev ()
   "Find end of previous form."
-  (if (acer--get-ptr-bwd "[.]\\([[:cntrl:]]\\)")
+  (if (etsa--get-ptr-bwd "[.]\\([[:cntrl:]]\\)")
       (match-beginning 1)
     (point-min)))
 
-(defun acer--form-next ()
+(defun etsa--form-next ()
   "Find beginning of next form."
-  (if (acer--get-ptr-fwd "[.]\\([[:cntrl:]]\\)")
+  (if (etsa--get-ptr-fwd "[.]\\([[:cntrl:]]\\)")
       (match-beginning 1)
     (point-max)))
 
-(defun acer--get-ptr-fwd (patt)
+(defun etsa--get-ptr-fwd (patt)
   "Get next location of PATT, while ignoring comments and strings."
-  (acer--get-ptr (lambda () (re-search-forward patt nil t))))
+  (etsa--get-ptr (lambda () (re-search-forward patt nil t))))
 
-(defun acer--get-ptr-bwd (patt)
+(defun etsa--get-ptr-bwd (patt)
   "Get previous location of PATT, while ignoring comments and strings."
-  (acer--get-ptr (lambda () (re-search-backward patt nil t))))
+  (etsa--get-ptr (lambda () (re-search-backward patt nil t))))
 
-(defun acer--get-ptr (finder)
+(defun etsa--get-ptr (finder)
   "Get location of thing found by FINDER, while ignoring comments and strings."
   (save-excursion
     (let ((case-fold-search nil)
           (ptr (funcall finder)))
-      (while (and ptr (acer--ignore-text-at-point-p))
+      (while (and ptr (etsa--ignore-text-at-point-p))
         (setq ptr (funcall finder)))
       ptr)))
 
-(defun acer--ignore-text-at-point-p ()
+(defun etsa--ignore-text-at-point-p ()
   "Check if text at point is to be ignored."
   (cl-member (get-text-property (point) 'face)
              '(font-lock-doc-face

@@ -23,6 +23,10 @@
    (cons 'erlang '("https://git.sr.ht/~massemanet/tree-sitter-erlang")))
   (treesit-install-language-grammar 'erlang))
 
+(defvar erlang-ts-man-dir
+  (concat user-emacs-directory "cache/erlang_mode_man_pages/")
+  "Location of local cache of man pages.")
+
 ;; load our subsystems
 (require 'erlang-ts-flycheck nil t)
 (require 'erlang-ts-acer nil t)
@@ -64,6 +68,8 @@
   ;; If ‘treesit-simple-imenu-settings’ is non-nil, set up Imenu.
   (setq-local
    treesit-simple-imenu-settings (erlang-ts-imenu-simple))
+
+  (erlang-ts-mode-keys)
 
   (treesit-major-mode-setup))
 
