@@ -4,7 +4,6 @@
 ;;; Code:
 
 (require 'woman)
-(require 'acer)
 (require 'erlang-ts-ts)
 
 (defun erlang-ts-man ()

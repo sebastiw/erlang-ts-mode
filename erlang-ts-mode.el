@@ -28,13 +28,14 @@
   "Location of local cache of man pages.")
 
 ;; load our subsystems
-(require 'erlang-ts-flycheck nil t)
 (require 'erlang-ts-acer nil t)
-(require 'erlang-ts-mode-map nil t)
-(require 'erlang-ts-fontlock nil t)
-(require 'erlang-ts-indent nil t)
-(require 'erlang-ts-imenu nil t)
 (require 'erlang-ts-defun nil t)
+(require 'erlang-ts-flycheck nil t)
+(require 'erlang-ts-fontlock nil t)
+(require 'erlang-ts-imenu nil t)
+(require 'erlang-ts-indent nil t)
+(require 'erlang-ts-man nil t)
+(require 'erlang-ts-mode-map nil t)
 
 (defgroup erlang-ts nil
   "Tree-sitter for Erlang."
