@@ -19,7 +19,7 @@ main(Args) ->
         ["words"]       -> out(words());
         ["erls", Root]  -> out(erls(ex(Root)));
         ["funs", File]  -> out(parse(ex(File)));
-        ["man", Mandir] -> out(pages(ex(Mandir)));
+        ["man", Mandir] -> out(man(ex(Mandir)));
         ["name", File]  -> out(info(name, ex(File)));
         ["incs", File]  -> out(info(incs, ex(File)));
         ["libs", File]  -> out(info(libs, ex(File)));
@@ -314,14 +314,14 @@ look_above(E, Es, Target) ->
     end.
 
 %% man pages
-pages(Root) ->
+man(Root) ->
     pipe(Root ++ "/*.3",
          [fun filelib:wildcard/1,
-          fun(X) -> lists:foldl(fun page/2, #{}, X) end,
+          fun(X) -> lists:foldl(fun man/2, #{}, X) end,
           fun(X) -> maps:fold(fun files_format/3, [], X) end,
           fun lists:sort/1]).
 
-page(F, A) ->
+man(F, A) ->
     A#{filename:basename(F, ".3") => F}.
 
 %% all relevant files in Root, deduped
@@ -390,12 +390,12 @@ do_parse(File) ->
     case lists:reverse(File) of
         "maeb."++_ -> walk(parse_get_ast_beam(File));
         "lre."++_ -> walk(parse_get_ast_erl(File));
-        "3."++_ -> man(File);
+        "3."++_ -> manpage(File);
         _ -> []
     end.
 
 %% all functions in man page
-man(Manpage) ->
+manpage(Manpage) ->
     pipe(Manpage,
          [fun file:read_file/1,
           fun({ok, B}) -> re:split(B, ".B|.br") end,

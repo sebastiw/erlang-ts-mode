@@ -44,7 +44,6 @@
 (defun erlang-ts-setup()
   "Initialize."
   (treesit-parser-create 'erlang)
-  (erlang-ts-mode-keys)
 
   ;; If ‘treesit-font-lock-settings’ is non-nil, set up fontification
   ;; and enable ‘font-lock-mode’.
@@ -70,6 +69,7 @@
    treesit-simple-imenu-settings (erlang-ts-imenu-simple))
 
   (erlang-ts-mode-keys)
+  (erlang-ts-acer-init)
 
   (treesit-major-mode-setup))
 

@@ -16,8 +16,12 @@
 (require 'cl-generic)
 (require 'cl-lib)
 
+;; imports
+(defvar erlang-ts-man-dir "")
+
+;; local paths
 (defvar-local etsa--path (file-name-directory (locate-library "erlang-ts-mode")))
-(defvar-local etsa--escript (concat etsa--path "etsa.escript"))
+(defvar-local etsa--escript (concat etsa--path "erlang-ts.escript"))
 (defvar-local etsa--man-path (concat erlang-ts-man-dir "man/" "man3/"))
 
 ;; OTP buffers
@@ -28,7 +32,6 @@
 (defvar-local etsa--buffer-otp-erls (get-buffer-create "*etsa--erls-otp*"))
 (defvar-local etsa--buffer-otp-srcs (get-buffer-create "*etsa--srcs-otp*"))
 
-;; buffer local variables
 ;; project name
 (defvar-local etsa--project-name ())
 
@@ -50,12 +53,19 @@
   (etsa--init-ac)
   (etsa--init-xref))
 
-(defun erlang-ts-aacer-libs (&optional filename)
+(defun erlang-ts-acer-libs (&optional filename)
   "All libs in the project that FILENAME belongs to."
   (let ((f (if filename filename (buffer-file-name))))
     (pcase (split-string (etsa--run-escript-str "libs" f))
       ((and paths (guard (string= "libs:" (car paths))))
        (cdr paths)))))
+
+(defun erlang-ts-acer-man (mod)
+  "Manpage filename for MOD."
+  (with-current-buffer etsa--buffer-man
+    (goto-char 1)
+    (when (re-search-forward (concat mod "=>") nil t)
+      (etsa--line-to-string 'right))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; we're using TAB to do 3 things; indenting, replacing, and

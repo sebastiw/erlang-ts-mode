@@ -11,18 +11,14 @@
   "Find manual page for mod:fun at point."
   (interactive)
   (pcase (erlang-ts-at-point)
-    (`(call . ,mfa)
-     (message "mfa: %s" mfa)
-     (pcase (split-string mfa "[:()]")
-       (`(,mod ,fun ,_ ,_)
-        (message "m f: %s %s" mod fun)
-        (pcase (acer-man-file mod)
-          ('nil (error "Can't find man page for %s:%s" mod fun))
-          (file
-           (woman-find-file file)
-           (when fun
-             (when (re-search-forward (concat "\s" fun "(") nil t)
-               (beginning-of-line))))))))))
+    (`(call ,m ,f)
+     (pcase (erlang-ts-acer-man m)
+       ('nil (error "Can't find man page for %s:%s" m f))
+       (file
+        (woman-find-file file)
+        (when f
+          (when (re-search-forward (concat "\s" f "(") nil t)
+            (beginning-of-line))))))))
 
 (provide 'erlang-ts-man)
 ;;; erlang-ts-man.el ends here

@@ -12,7 +12,7 @@
      (let ((expr (treesit-node-child-by-field-name n "expr")))
        (pcase (treesit-query-capture expr '((remote (remote_module (atom) @m) (atom) @f)))
          ('nil (list nil (treesit-node-text expr t)))
-         (`((m . ,m) (f . ,f)) (list (treesit-node-text m t) (treesit-node-text f t))))))))
+         (`((m . ,m) (f . ,f)) (list 'call (treesit-node-text m t) (treesit-node-text f t))))))))
 
 (defun erlang-ts--is-call (node)
   "Return the closest parent of NODE that is a `call'."
