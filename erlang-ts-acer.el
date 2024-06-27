@@ -217,9 +217,9 @@
 
 (cl-defmethod xref-backend-identifier-at-point ((_backend (eql etsa)))
   "Return etsa--item for item at point."
-  (pcase (erlang-get-identifier-at-point)
-    (`(qualified-function ,m ,f ,a)
-     (etsa--make-item m f a))
+  (pcase (erlang-ts-at-point)
+    (`(call ,m ,f)
+     (etsa--make-item m f))
     ((and `(nil ,m ,f ,a) (guard (string= m (erlang-get-module))))
      (etsa--make-item nil f a))
     (`(nil ,m ,f ,a)
