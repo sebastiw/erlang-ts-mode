@@ -1,26 +1,50 @@
 ;;; erlang-ts-ts --- Some treesitter wrappers.
 ;;; Commentary:
-;;;
+;;
+;; Replacements for utilities in erlang.el. Missing;
+;;     erlang-get-function-arguments
+;;     erlang-get-function-arity
+;;     erlang-get-function-name
+;;     erlang-get-import
+;;     erlang-get-module
+;;     erlang-match-next-function
+;;
 ;;; Code:
 
 (require 'treesit)
 
 (defun erlang-ts-at-point ()
-  "Return thing at point as text."
+  "Thing at point as tagged list."
   (pcase (treesit-node-at (point))
-    ((app (erlang-ts--is-call) (and n (guard n)))
-     (let ((expr (treesit-node-child-by-field-name n "expr")))
-       (pcase (treesit-query-capture expr '((remote (remote_module (atom) @m) (atom) @f)))
-         ('nil (list nil (treesit-node-text expr t)))
-         (`((m . ,m) (f . ,f)) (list 'call (treesit-node-text m t) (treesit-node-text f t))))))))
+    ((app (etst--ancestor "call") (and n (guard n))) (etst--extract-call n))))
 
-(defun erlang-ts--is-call (node)
-  "Return the closest parent of NODE that is a `call'."
-  (treesit-parent-until node 'erlang-ts--callp))
+(defun etst--extract-call (node)
+  "If NODE is a `call', return (local-call F A Args) or (remote-call M F A Args)."
+  (let* ((expr (etst--child "expr" node))
+         (args (etst--map-children #'etst--txt (etst--child "args" node)))
+         (arity (length args))
+         (query '((remote (remote_module (atom) @m) (atom) @f))))
+    (pcase (treesit-query-capture expr query)
+      ('nil
+       (list 'local-call (etst--txt expr) arity args))
+      (`((m . ,m) (f . ,f))
+       (list 'remote-call (etst--txt m) (etst--txt f) arity args)))))
 
-(defun erlang-ts--callp (node)
-  "NODE is a call."
-  (string= (treesit-node-type node) "call"))
+(defun etst--map-children (fun node)
+  "Map named children of NODE with FUN."
+  (mapcar fun (treesit-node-children node t)))
+
+(defun etst--child (field node)
+  "The child of NODE in FIELD."
+  (treesit-node-child-by-field-name node field))
+
+(defun etst--txt (node)
+  "Text representation of NODE."
+  (treesit-node-text node t))
+
+(defun etst--ancestor (type node)
+  "The closest parent of NODE that is a TYPE."
+  (treesit-parent-until node (lambda(n) (string= (treesit-node-type n) type))))
 
 (provide 'erlang-ts-ts)
 ;;; erlang-ts-ts.el ends here

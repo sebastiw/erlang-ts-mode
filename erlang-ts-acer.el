@@ -218,12 +218,10 @@
 (cl-defmethod xref-backend-identifier-at-point ((_backend (eql etsa)))
   "Return etsa--item for item at point."
   (pcase (erlang-ts-at-point)
-    (`(call ,m ,f)
-     (etsa--make-item m f))
-    ((and `(nil ,m ,f ,a) (guard (string= m (erlang-get-module))))
-     (etsa--make-item nil f a))
-    (`(nil ,m ,f ,a)
-     (etsa--make-item m f a))))
+    (`(remote-call ,m ,f ,a ,_)
+     (etsa--make-item m f a))
+    (`(local-call ,f ,a ,_)
+     (etsa--make-item nil f a))))
 
 (cl-defmethod xref-backend-definitions ((_backend (eql etsa)) ai)
   "List of `xref-item' for `etsa--item' AI."
