@@ -49,6 +49,7 @@
   (setq etsa--buffer-srcs (etsa--create-buffer "paths")
         etsa--buffer-funs (etsa--create-buffer "funs")
         etsa--buffer-erls (etsa--create-buffer "erls"))
+  (message "erlang-ts-acer: indexing your erlang code. Will take a few seconds...")
   (etsa--fill-initial)
   (etsa--init-ac)
   (etsa--init-xref))
@@ -306,7 +307,7 @@ AI.mod is ignored, AI.fun is completed."
   "Return list of `etsa--item' by completing AI in local buffer.
 AI.mod is ignored, AI.fun should be completed."
   (let ((file (buffer-file-name))
-        (mod (erlang-get-module))
+        (mod (erlang-ts-module))
         (fun (etsa--item-fun ai))
         (arity (etsa--item-arity ai))
         (hit))

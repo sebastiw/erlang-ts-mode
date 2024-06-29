@@ -20,7 +20,9 @@
 (unless (treesit-language-available-p 'erlang)
   (add-to-list
    'treesit-language-source-alist
-   (cons 'erlang '("https://git.sr.ht/~massemanet/tree-sitter-erlang")))
+   (cons 'erlang '("https://github.com/sebastiw/erlang-ts-mode"
+		   "masse00"
+		   "tree-sitter-erlang/src")))
   (treesit-install-language-grammar 'erlang))
 
 (defvar erlang-ts-man-dir

@@ -13,6 +13,13 @@
 
 (require 'treesit)
 
+(defun erlang-ts-module ()
+  "The value of the `module' attribute as a string."
+  (let ((mod (etst--single-child "module_attribute" (treesit-buffer-root-node))))
+    (when mod
+      (etst--txt
+       (etst--child "name" mod)))))
+
 (defun erlang-ts-at-point ()
   "Thing at point as tagged list."
   (pcase (treesit-node-at (point))
@@ -33,6 +40,15 @@
 (defun etst--map-children (fun node)
   "Map named children of NODE with FUN."
   (mapcar fun (treesit-node-children node t)))
+
+(defun etst--single-child (field node)
+  "Return FIELD attribute of NODE."
+  (pcase (etst--children field node)
+    (`(,mod) mod)))
+
+(defun etst--children (field node)
+  "List of FIELD children in NODE."
+  (treesit-filter-child node (lambda(n) (string= (treesit-node-type n) field))))
 
 (defun etst--child (field node)
   "The child of NODE in FIELD."
