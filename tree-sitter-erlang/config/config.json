@@ -1,0 +1,23 @@
+{
+    "parser-directories": [
+        "{{PARSER_DIRS}}"
+    ],
+    "theme": {
+        "attribute": { "color": "#ffff87", "italic": true },
+        "comment": { "color": "#8a8a8a", "italic": true },
+        "constant": "#ff5f00",
+        "function": "#87d7ff",
+        "function.builtin": { "color": "#87d7ff", "bold": true },
+        "keyword": "#ffff5f",
+        "module": "#87d7ff",
+        "number": "#d7ff87",
+        "operator": "#d7ffaf",
+        "property": "#afafff",
+        "punctuation": "#d0d0d0",
+        "string": "#ff5f00",
+        "string.special": "#ffaf5f",
+        "type": "#ffff5f",
+        "type.builtin": { "color": "#ffff5f", "bold": true },
+        "variable": "#ff00af"
+    }
+}

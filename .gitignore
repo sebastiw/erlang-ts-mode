@@ -9,3 +9,8 @@
 
 # Undo-tree save-files
 *.~undo-tree
+
+tree-sitter-erlang/bin/tree-sitter
+tree-sitter-erlang/erlang.*
+tree-sitter-erlang/src/grammar.json
+tree-sitter-erlang/src/node-types.json
