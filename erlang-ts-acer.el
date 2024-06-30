@@ -7,7 +7,6 @@
 ;;; application, 3) other included applications (in an umbrella
 ;;; project), 4) dependencies, and 5) OTP.
 ;;;
-;;;
 ;;; Code:
 ;;; -*- lexical-binding: t -*-
 
@@ -306,26 +305,19 @@ AI.mod is ignored, AI.fun is completed."
 (defun etsa--expand-f-to-a-local (ai)
   "Return list of `etsa--item' by completing AI in local buffer.
 AI.mod is ignored, AI.fun should be completed."
-  (let ((file (buffer-file-name))
-        (mod (erlang-ts-module))
+  (let ((mod (erlang-ts-module))
         (fun (etsa--item-fun ai))
         (arity (etsa--item-arity ai))
-        (hit))
-    (save-excursion
-      (goto-char 1)
-      (while (and (null hit)
-                  (erlang-match-next-function (point-max)))
-        (beginning-of-line)
-        (let* ((f (erlang-get-function-name))
-               (args (erlang-get-function-arguments))
-               (a (when args (number-to-string (erlang-get-function-arity))))
-               (line (number-to-string (line-number-at-pos))))
-          (end-of-line)
-          (when (and args
-                     (equal f fun)
-                     (if arity (equal a arity) t))
-            (setq hit (etsa--make-item mod f a line args file))))))
-    (when hit (list hit))))
+        (file (buffer-file-name))
+        (fdecls (erlang-ts-fdecls)))
+    (seq-reduce (lambda(ais fdecl) (etsa--f-exact-2a mod fun arity file fdecl ais)) fdecls nil)))
+
+(defun etsa--f-exact-2a (mod fun arity file fdecl ais)
+  "If FUN and ARITY match FDECL, convert FDECL to an AI and cons to AIS."
+  (pcase fdecl
+    ((and `(fdecl ,n ,a ,l ,as) (guard (string= n fun)) (guard (string= a arity)))
+     (cons (etsa--make-item mod n a l as file) ais))
+    (_ ais)))
 
 (defun etsa--expand-f-to-a-imports (ai)
   "Return list of `etsa--item' where AI.fun is imported.
@@ -359,22 +351,17 @@ AI.mod is ignored."
   "Return list of `etsa--item' by completing AI in local buffer.
 AI.mod is ignored,"
   (let ((file (buffer-file-name))
-        (mod (erlang-get-module))
+        (mod (erlang-ts-module))
         (fun (etsa--item-fun ai))
-        (ais))
-    (save-excursion
-      (goto-char 1)
-      (while (erlang-match-next-function (point-max))
-        (beginning-of-line)
-        (let* ((f (erlang-get-function-name))
-               (args (erlang-get-function-arguments))
-               (a (when args (number-to-string (erlang-get-function-arity))))
-               (line (number-to-string (line-number-at-pos))))
-          (end-of-line)
-          (when (and args
-                     (string-prefix-p fun f))
-            (push (etsa--make-item mod f a line args file) ais)))))
-    (nreverse ais)))
+        (fdecls (erlang-ts-fdecls)))
+    (seq-reduce (lambda(ais fdecl) (etsa--f-prefix-2a mod fun file fdecl ais)) fdecls nil)))
+
+(defun etsa--f-prefix-2a (mod fun file fdecl ais)
+  "If FUN is a prefix of FDECL, convert FDECL to an AI and cons to AIS."
+  (pcase fdecl
+    ((and `(fdecl ,n ,a ,l ,as) (guard (string-prefix-p fun n)))
+     (cons (etsa--make-item mod n a l as file) ais))
+    (_ ais)))
 
 (defun etsa--expand-nil-to-f-imports (ai)
   "Return list of `etsa--item' where AI.fun is imported."
@@ -622,15 +609,11 @@ DIR is `right'), or bol and eol (otherwise)."
 
 (defun etsa--items-from-imports ()
   "Imports as list of `etsa--item'."
-  (seq-reduce
-   (lambda (a v)
-     (let ((cv (car v)))
-       (seq-reduce
-        (lambda (b w) (cons (etsa--make-item cv (car w) (cdr w)) b))
-        (cdr v)
-        a)))
-   (erlang-get-import)
-   ()))
+  (mapcar #'etsa--extract-import (erlang-ts-imports)))
+
+(defun etsa--extract-import (import)
+  (pcase import
+    (`(import ,m ,f ,a) (etsa--make-item m f a))))
 
 (defun etsa--make-item (m &optional f a l as file)
   "Construct an `etsa--item' from components.
