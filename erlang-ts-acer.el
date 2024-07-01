@@ -45,7 +45,7 @@
 (defun erlang-ts-acer-init ()
   "Init etsa in current buffer."
   (etsa--project-name (buffer-file-name))
-  (setq etsa--buffer-srcs (etsa--create-buffer "paths")
+  (setq etsa--buffer-srcs (etsa--create-buffer "srcs")
         etsa--buffer-funs (etsa--create-buffer "funs")
         etsa--buffer-erls (etsa--create-buffer "erls"))
   (message "erlang-ts-acer: indexing your erlang code. Will take a few seconds...")
