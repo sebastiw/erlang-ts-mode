@@ -14,6 +14,7 @@ dbg({T, L, M, F, R}) -> io:fwrite(standard_error, "~n~p ~s:~s::~w ~p~n", [T, M, 
 
 main(Args) ->
     case Args of
+        ["version"]     -> out(version());
         ["bifs"]        -> out(bifs());
         ["guards"]      -> out(guards());
         ["words"]       -> out(words());
@@ -45,6 +46,9 @@ format(Format, As) ->
 %% path to otp
 otp() ->
     code:root_dir().
+
+version() ->
+    erlang:system_info(otp_release).
 
 words() ->
     keywords()++operators().

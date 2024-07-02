@@ -14,17 +14,13 @@
 (require 'xref)
 (require 'cl-generic)
 (require 'cl-lib)
-
-;; imports
-(defvar erlang-ts-man-dir "")
+(require 'erlang-ts-ts)
 
 ;; local paths
 (defvar-local etsa--path (file-name-directory (locate-library "erlang-ts-mode")))
 (defvar-local etsa--escript (concat etsa--path "erlang-ts.escript"))
-(defvar-local etsa--man-path (concat erlang-ts-man-dir "man/" "man3/"))
 
 ;; OTP buffers
-(defvar-local etsa--buffer-man (get-buffer-create "*etsa--man*"))
 (defvar-local etsa--buffer-bifs (get-buffer-create "*etsa--bifs*"))
 (defvar-local etsa--buffer-guards (get-buffer-create "*etsa--guards*"))
 (defvar-local etsa--buffer-words (get-buffer-create "*etsa--words*"))
@@ -41,6 +37,10 @@
 
 ;;; We do most of our work in lists of this base struct
 (cl-defstruct etsa--item mod fun arity line args file)
+
+(defun erlang-ts-otp-version ()
+  "The OTP version."
+  (etsa--run-escript-str "version"))
 
 (defun erlang-ts-acer-init ()
   "Init etsa in current buffer."
@@ -59,13 +59,6 @@
     (pcase (split-string (etsa--run-escript-str "libs" f))
       ((and paths (guard (string= "libs:" (car paths))))
        (cdr paths)))))
-
-(defun erlang-ts-acer-man (mod)
-  "Manpage filename for MOD."
-  (with-current-buffer etsa--buffer-man
-    (goto-char 1)
-    (when (re-search-forward (concat mod "=>") nil t)
-      (etsa--line-to-string 'right))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; we're using TAB to do 3 things; indenting, replacing, and
@@ -313,7 +306,8 @@ AI.mod is ignored, AI.fun should be completed."
     (seq-reduce (lambda(ais fdecl) (etsa--f-exact-2a mod fun arity file fdecl ais)) fdecls nil)))
 
 (defun etsa--f-exact-2a (mod fun arity file fdecl ais)
-  "If FUN and ARITY match FDECL, convert FDECL to an AI and cons to AIS."
+  "Use MOD, FDECL, and FILE to create an AI and cons it to AIS.
+But only if FUN and ARITY match the values in FDECL."
   (pcase fdecl
     ((and `(fdecl ,n ,a ,l ,as) (guard (string= n fun)) (guard (string= a arity)))
      (cons (etsa--make-item mod n a l as file) ais))
@@ -357,7 +351,8 @@ AI.mod is ignored,"
     (seq-reduce (lambda(ais fdecl) (etsa--f-prefix-2a mod fun file fdecl ais)) fdecls nil)))
 
 (defun etsa--f-prefix-2a (mod fun file fdecl ais)
-  "If FUN is a prefix of FDECL, convert FDECL to an AI and cons to AIS."
+  "Use MOD, FDECL, and FILE to create an AI and cons it to AIS.
+But only if FUN is a prefix of the value in FDECL."
   (pcase fdecl
     ((and `(fdecl ,n ,a ,l ,as) (guard (string-prefix-p fun n)))
      (cons (etsa--make-item mod n a l as file) ais))
@@ -414,7 +409,6 @@ AI.mod should be completed."
 
 (defun etsa--fill-initial ()
   "Fills buffers."
-  (etsa--fill-man)
   (etsa--fill-bifs)
   (etsa--fill-guards)
   (etsa--fill-words)
@@ -422,12 +416,6 @@ AI.mod should be completed."
   (etsa--fill-project-srcs)
   (etsa--fill-erls etsa--buffer-otp-srcs etsa--buffer-otp-erls)
   (etsa--fill-erls etsa--buffer-srcs etsa--buffer-erls))
-
-(defun etsa--fill-man ()
-  "Populate paths to all OTP man files."
-  (with-current-buffer etsa--buffer-man
-    (unless (< 0 (buffer-size))
-      (etsa--run-escript "man" etsa--man-path))))
 
 (defun etsa--fill-otp-srcs ()
   "Populate paths to all directories containing project erls."
@@ -612,6 +600,7 @@ DIR is `right'), or bol and eol (otherwise)."
   (mapcar #'etsa--extract-import (erlang-ts-imports)))
 
 (defun etsa--extract-import (import)
+  "Create an AI from IMPORT; an `(imort M F A)."
   (pcase import
     (`(import ,m ,f ,a) (etsa--make-item m f a))))
 
