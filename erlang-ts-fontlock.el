@@ -12,7 +12,7 @@
   "A `treesit-font-lock-feature-list'."
   '((comment string atom variable) ; level 1
     (function-name keyword boolean bitwise math) ; level 2
-    (call-remote call-local))) ; level 3
+    (call-remote call-local macro-defa macro-defv macro-call macro-var define))) ; level 3
 
 (defmacro etsf--rule (name query)
   "NAME QUERY FACE."
@@ -33,7 +33,12 @@
    (etsf--rule keyword (["after" "begin" "case" "catch" "else" "end" "fun" "if" "maybe" "of" "receive" "try" "when"] @font-lock-keyword-face))
    (etsf--rule boolean (["and" "andalso" "not" "or" "orelse" "xor"] @font-lock-builtin-face))
    (etsf--rule bitwise (["band" "bnot" "bor" "bsl" "bsr" "bxor"] @font-lock-builtin-face))
-   (etsf--rule math (["div" "rem"] @font-lock-builtin-face)))
+   (etsf--rule math (["div" "rem"] @font-lock-builtin-face))
+   (etsf--rule define (["define"] @font-lock-preprocessor-face))
+   (etsf--rule macro-defa ((macro_lhs (atom) @font-lock-preprocessor-face)))
+   (etsf--rule macro-defv ((macro_lhs (var) @font-lock-preprocessor-face)))
+   (etsf--rule macro-call ((macro_call_expr (atom) @font-lock-preprocessor-face)))
+   (etsf--rule macro-var ((macro_call_expr (var) @font-lock-preprocessor-face))))
   "A list of `font-lock-rule'.")
 
 (defun erlang-ts-fontlock ()

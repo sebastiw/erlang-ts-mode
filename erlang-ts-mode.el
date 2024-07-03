@@ -21,6 +21,12 @@
     (add-to-list 'treesit-language-source-alist (cons 'erlang src)))
   (treesit-install-language-grammar 'erlang))
 
+;; register handled file types
+(add-to-list 'interpreter-mode-alist (cons "escript" 'erlang-ts-mode))
+(let ((es '("\\.erl$" "\\.app\\.src$" "\\.hrl$" "\\.xrl$" "\\.yrl$" "/ebin/.+\\.app$")))
+  (dolist (e es)
+    (add-to-list 'auto-mode-alist (cons e 'erlang-ts-mode))))
+
 ;; load our subsystems
 (require 'erlang-ts-acer nil t)
 (require 'erlang-ts-defun nil t)
@@ -29,13 +35,13 @@
 (require 'erlang-ts-imenu nil t)
 (require 'erlang-ts-indent nil t)
 (require 'erlang-ts-man nil t)
-(require 'erlang-ts-mode-map nil t)
+(require 'erlang-ts-keymap nil t)
 
 (defvar erlang-ts-otp-version (erlang-ts-otp-version) "OTP version.")
 (defvar erlang-ts-man-buffer "" "Man pages buffer.")
 (defvar erlang-ts-cache-dir (concat user-emacs-directory "cache/") "Cache dir.")
 
-;; these should be run before we open any erlang files.
+;; these should be run before erlang-ts-mode
 (make-directory erlang-ts-cache-dir t)
 (erlang-ts-man-init)
 
@@ -72,7 +78,6 @@
    treesit-simple-imenu-settings (erlang-ts-imenu-simple))
 
   (erlang-ts-acer-init)
-  (erlang-ts-mode-keys)
 
   (treesit-major-mode-setup))
 
@@ -82,11 +87,6 @@
   :group 'erlang-ts
   (when (treesit-ready-p 'erlang)
     (erlang-ts-setup)))
-
-;;;###autoload
-(let ((es '("\\.erl$" "\\.app\\.src$" "\\.escript" "\\.hrl$" "\\.xrl$" "\\.yrl" "/ebin/.+\\.app")))
-  (dolist (e es)
-    (add-to-list 'auto-mode-alist (cons e 'erlang-ts-mode))))
 
 (provide 'erlang-ts-mode)
 ;;; erlang-ts-mode.el ends here
