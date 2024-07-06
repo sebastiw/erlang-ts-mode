@@ -38,6 +38,7 @@
 (require 'erlang-ts-keymap nil t)
 
 ;; some globals
+(defvar erlang-ts-new-file-hook nil "Run when `erlang-ts-mode' is called in an empty buffer.")
 (defvar erlang-ts-otp-version (erlang-ts-otp-version) "OTP version.")
 (defvar erlang-ts-man-buffer "" "Man pages buffer.")
 (defvar erlang-ts-cache-dir (concat user-emacs-directory "cache/") "Cache dir.")
@@ -74,6 +75,9 @@
   ;; If ‘treesit-simple-imenu-settings’ is non-nil, set up Imenu.
   (setq-local
    treesit-simple-imenu-settings (erlang-ts-imenu-simple))
+
+  (when (zerop (buffer-size))
+    (run-hooks 'erlang-ts-new-file-hook))
 
   (erlang-ts-acer-init)
 
