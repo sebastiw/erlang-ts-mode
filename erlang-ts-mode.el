@@ -21,7 +21,7 @@
     (add-to-list 'treesit-language-source-alist (cons 'erlang src)))
   (treesit-install-language-grammar 'erlang))
 
-;; register handled file types
+;; register handled file types (or patterns, rather)
 (add-to-list 'interpreter-mode-alist (cons "escript" 'erlang-ts-mode))
 (let ((es '("\\.erl$" "\\.app\\.src$" "\\.hrl$" "\\.xrl$" "\\.yrl$" "/ebin/.+\\.app$")))
   (dolist (e es)
@@ -37,6 +37,7 @@
 (require 'erlang-ts-man nil t)
 (require 'erlang-ts-keymap nil t)
 
+;; some globals
 (defvar erlang-ts-otp-version (erlang-ts-otp-version) "OTP version.")
 (defvar erlang-ts-man-buffer "" "Man pages buffer.")
 (defvar erlang-ts-cache-dir (concat user-emacs-directory "cache/") "Cache dir.")
@@ -45,13 +46,10 @@
 (make-directory erlang-ts-cache-dir t)
 (erlang-ts-man-init)
 
-(defgroup erlang-ts nil
-  "Tree-sitter for Erlang."
-  :group 'languages
-  :prefix "erlang-ts-")
-
+;; This is run as if it was defined in `erlang-ts-mode-hook'. So
+;; e.g. `setq-local' is set in the `.erl' buffer.
 (defun erlang-ts-setup()
-  "Initialize."
+  "Run when `erlang-ts-mode' is called."
   (treesit-parser-create 'erlang)
 
   ;; If ‘treesit-font-lock-settings’ is non-nil, set up fontification
@@ -80,6 +78,11 @@
   (erlang-ts-acer-init)
 
   (treesit-major-mode-setup))
+
+(defgroup erlang-ts nil
+  "Tree-sitter for Erlang."
+  :group 'languages
+  :prefix "erlang-ts-")
 
 ;;;###autoload
 (define-derived-mode erlang-ts-mode prog-mode "Erlang"
