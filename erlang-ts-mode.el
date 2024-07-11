@@ -79,6 +79,10 @@
   (when (zerop (buffer-size))
     (run-hooks 'erlang-ts-new-file-hook))
 
+  (require 'erlang-ts-fill)
+  (setq-local
+   fill-paragraph-function 'erlang-ts-fill)
+
   (erlang-ts-acer-init)
 
   (treesit-major-mode-setup))

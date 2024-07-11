@@ -20,6 +20,16 @@
       flycheck-protobuf-protoc-executable "protoc -I../../.."
       flycheck-checker 'erlang-ts)
 
+(flycheck-define-checker erlang-ts-escript
+  "An Erlang syntax checker using escript."
+  :command ("escript" source)
+  :error-patterns
+  ((warning line-start
+            (file-name) ":" line ":" column ": Warning:" (message) line-end)
+   (error line-start (file-name) ":" line ":" column ": " (message) line-end))
+  :modes (erlang-ts-mode erlang-mode)
+  :enabled (lambda () (string-suffix-p ".escript" (buffer-file-name))))
+
 (flycheck-define-checker erlang-ts
   "An Erlang syntax checker using the Erlang interpreter.
 See URL `http://www.erlang.org/'."

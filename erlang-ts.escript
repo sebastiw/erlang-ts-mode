@@ -18,15 +18,15 @@ main(Args) ->
         ["bifs"]        -> out(bifs());
         ["guards"]      -> out(guards());
         ["words"]       -> out(words());
-        ["erls", Root]  -> out(erls(ex(Root)));
+        ["info", File]  -> io:fwrite("~p~n", [info(ex(File))]);
+        ["erls", File]  -> out(erls(ex(File)));
         ["funs", File]  -> out(parse(ex(File)));
-        ["man", Mandir] -> out(man(ex(Mandir)));
+        ["man", File]   -> out(man(ex(File)));
         ["name", File]  -> out(info(name, ex(File)));
         ["incs", File]  -> out(info(incs, ex(File)));
         ["libs", File]  -> out(info(libs, ex(File)));
         ["srcs", "otp"] -> out(info(srcs, otp()));
-        ["srcs", File]  -> out(info(srcs, ex(File)));
-        ["info", File]  -> io:fwrite("~p~n", [info(ex(File))])
+        ["srcs", File]  -> out(info(srcs, ex(File)))
     end.
 
 %% print string or list of strings.
@@ -116,16 +116,16 @@ info(File) ->
 
 %% we try various possible root dirs. The first match will throw an info.
 root_finder(File) ->
-    root_acer(File),
+    root_erlang_ts(File),
     root_otp(File),
     root_rebar(File),
     root_lib_src(File),
     root_src(File),
     root_single(File).
 
-%% look for .acer above us.
-root_acer(File) ->
-    case acer_file(look_above(".acer", File)) of
+%% look for .erlang_ts above us.
+root_erlang_ts(File) ->
+    case erlang_ts_file(look_above(".erlang-ts", File)) of
         false -> false;
         Cfg -> throw(Cfg)
     end.
@@ -174,20 +174,20 @@ root_single(File) ->
 small_info(Root, Name, Srcs) ->
     #{root => Root, name => Name, srcs => Srcs}.
 
-%% handle the .acer file
-acer_file(false) -> false;
-acer_file(Dir) ->
-    F = ex(filename:join(Dir, ".acer")),
+%% handle the .erlang-ts file
+erlang_ts_file(false) -> false;
+erlang_ts_file(Dir) ->
+    F = ex(filename:join(Dir, ".erlang-ts")),
     case filelib:is_regular(F) andalso file:consult(F) of
-        {ok, [Cfg]} -> acer_file(Dir, Cfg);
+        {ok, [Cfg]} -> erlang_ts_file(Dir, Cfg);
         _ -> false
     end.
 
-acer_file(Dir, Cfg) ->
+erlang_ts_file(Dir, Cfg) ->
     pipe(Cfg#{root => Dir},
-         [fun acer_file_env/1,
-          fun acer_file_name/1,
-          fun(X) -> acer_file_dirs([srcs, incs, libs], X) end]).
+         [fun erlang_ts_file_env/1,
+          fun erlang_ts_file_name/1,
+          fun(X) -> erlang_ts_file_dirs([srcs, incs, libs], X) end]).
 
 %% `env' holds a proplist {Key, Val}, whare Val (a string) can contain
 %% references to other (previously defined) {K, V}. We expand Val by
@@ -195,20 +195,20 @@ acer_file(Dir, Cfg) ->
 %% #{K => ExpandedV}. Note that the input (the KV proplist) is
 %% ordered, and the expander will use previously expanded versions of
 %% V. It's all rather similar to lisp's `let*'.
-acer_file_env(Cfg) ->
-    ExpandOneV = fun(V, KVs) -> acer_file_expand_env(V, Cfg#{env => KVs}) end,
+erlang_ts_file_env(Cfg) ->
+    ExpandOneV = fun(V, KVs) -> erlang_ts_file_expand(V, Cfg#{env => KVs}) end,
     ExpandOneKV = fun({K, V}, KVs) -> KVs#{K => ExpandOneV(V, KVs)} end,
     ExpandAllKVs = fun(KVs) -> lists:foldl(ExpandOneKV, #{}, KVs) end,
     maps:update_with(env, ExpandAllKVs, #{}, Cfg).
 
 %% If we get name from the user, use it. Otherwise, use basename of Root.
-acer_file_name(#{root := Root} = Cfg) ->
+erlang_ts_file_name(#{root := Root} = Cfg) ->
     maps:merge(#{name => filename:basename(Root)}, Cfg).
 
 %% we have a set of keys, and for each key we have a set of paths, and
 %% each path is expanded.
-acer_file_dirs(Keys, Cfg0) ->
-    ExpandOne = fun(Path) -> acer_file_expand_env(Path, Cfg0) end,
+erlang_ts_file_dirs(Keys, Cfg0) ->
+    ExpandOne = fun(Path) -> erlang_ts_file_expand(Path, Cfg0) end,
     ExpandAll = fun(Paths) -> lists:map(ExpandOne, Paths) end,
     Update = fun(Key, Cfg) -> maps:update_with(Key, ExpandAll, [], Cfg) end,
     lists:foldl(Update, Cfg0, Keys).
@@ -216,23 +216,27 @@ acer_file_dirs(Keys, Cfg0) ->
 %% Envs is a [{KEY, VAL}], where VAL can be a bash command ("$(CMD)")
 %% or a string. The string can contain vars ("$KEY", where KEY matches
 %% "[a-z0-9-_]*"); the vars will be replaced by their VAL.
-acer_file_expand_env(Subj, #{root := Root} = Cfg) ->
+erlang_ts_file_expand(Subj, #{root := Root} = Cfg) ->
     case {regexp(Subj, "^[$][(]([^)]*)[)]$"), regexp(Subj, "[$]([a-z0-9_-]*)")} of
-        {[], [[]]} -> Subj;
-        {[Cmd], [[]]} -> acer_file_sh(Root, Cmd);
-        {[], Vars} -> lists:foldl(mk_acer_file_replace(Cfg), Subj, Vars)
+        {[], []} -> Subj;
+        {[Cmd], []} -> erlang_ts_file_sh(Root, Cmd);
+        {[], Vars} -> erlang_ts_file_env(Subj, Vars, Cfg);
+        {[_], Vars} -> erlang_ts_file_expand(erlang_ts_file_env(Subj, Vars, Cfg), Cfg)
     end.
 
-acer_file_sh(WorkDir, Cmd) ->
+erlang_ts_file_sh(WorkDir, Cmd) ->
     case sh(WorkDir, Cmd) of
         R when 0 < length(R) -> lists:last(R);
-        R -> exit({sh, WorkDir, Cmd, R})
+        [] -> []
     end.
 
-mk_acer_file_replace(#{env := Env}) ->
-    fun(Var, Subj) -> replace(Subj, "[$]"++Var, acer_file_replacement(Var, Env)) end.
+erlang_ts_file_env(Subj, Vars, Cfg) ->
+    lists:foldl(mk_erlang_ts_file_replace(Cfg), Subj, Vars).
 
-acer_file_replacement(Var, Env) ->
+mk_erlang_ts_file_replace(#{env := Env}) ->
+    fun(Var, Subj) -> replace(Subj, "[$]"++Var, erlang_ts_file_replacement(Var, Env)) end.
+
+erlang_ts_file_replacement(Var, Env) ->
     maps:get(list_to_atom(Var), Env).
 
 %% wrap os:cmd
@@ -240,7 +244,7 @@ sh(WorkingDir, Cmd) ->
     C = io_lib:format("cd ~s && ~s ; printf 'x%s\n' $?", [WorkingDir, Cmd]),
     case lists:reverse(os:cmd(C)) of
         "\n0x"++R -> string:tokens(lists:reverse(R), "\n");
-        _ -> ""
+        R -> error({sh, lists:reverse(R)})
     end.
 
 %% wrap re:replace
@@ -250,8 +254,12 @@ replace(Subject, RE, Replacement) ->
 %% wrap re:run
 regexp(Subject, RE) ->
     case re:run(Subject, RE, [global, {capture, all_but_first, list}]) of
-        {match, [Ms]} -> Ms;
-        nomatch -> []
+        nomatch -> [];
+        {match, Ms} ->
+            case [M || [M] <- Ms] of
+                [[]|X] -> X;
+                X -> X
+            end
     end.
 
 expand_paths(Key, #{root := Root} = Cfg) ->
