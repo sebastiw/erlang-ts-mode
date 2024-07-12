@@ -14,20 +14,21 @@ dbg({T, L, M, F, R}) -> io:fwrite(standard_error, "~n~p ~s:~s::~w ~p~n", [T, M, 
 
 main(Args) ->
     case Args of
-        []              -> out(ok);
-        ["info", File]  -> out(info(ex(File)));
-        ["version"]     -> out(version());
-        ["bifs"]        -> out(bifs());
-        ["guards"]      -> out(guards());
-        ["words"]       -> out(words());
-        ["erls", Srcs]  -> out(erls(Srcs));
-        ["funs", File]  -> out(parse(ex(File)));
-        ["man", File]   -> out(man(ex(File)));
-        ["name", File]  -> out(info(name, ex(File)));
-        ["incs", File]  -> out(info(incs, ex(File)));
-        ["libs", File]  -> out(info(libs, ex(File)));
-        ["srcs", "otp"] -> out(info(srcs, otp()));
-        ["srcs", File]  -> out(info(srcs, ex(File)))
+        []                -> out(ok);
+        ["version"]       -> out(version());
+        ["bifs"]          -> out(bifs());
+        ["guards"]        -> out(guards());
+        ["words"]         -> out(words());
+        ["erls", Srcs]    -> out(erls(Srcs));
+        ["funs", File]    -> out(parse(ex(File)));
+        ["man", File]     -> out(man(ex(File)));
+        ["srcs", "otp"]   -> out(info(srcs, otp()));
+        ["srcs", File]    -> out(info(srcs, ex(File)));
+        ["incs", File]    -> out(info(incs, ex(File)));
+        ["libs", File]    -> out(info(libs, ex(File)));
+        ["name", File]    -> out(info(name, ex(File)));
+	["info", File]    -> out(info(all , ex(File)));
+        ["info", K, File] -> out(info(list_to_atom(K), ex(File)))
     end.
 
 %% print string or list of strings.
@@ -94,20 +95,29 @@ guards() ->
      "min", "node", "node", "round", "self", "size", "tl", "trunc", "tuple_size"].
 
 %% select Key from info of File's project, or []
-info(name, File) ->
-    maps:get(name, info(File));
 info(libs, File) ->
-    ["libs:"|format_paths(libs, File)];
+    ["libs:"|format_info(maps:get(libs, info(File), []))];
 info(incs, File) ->
-    ["incs:"|format_paths(incs, File)];
+    ["incs:"|format_info(maps:get(incs, info(File), []))];
 info(srcs, File) ->
-    ["srcs:"|format_paths(srcs, File)].
+    ["srcs:"|format_info(maps:get(srcs, info(File), []))];
+info(all, File) ->
+    format_info(info(File));
+info(Key, File) ->
+    format_info(maps:get(Key, info(File), [])).
 
-format_paths(Key, File) ->
-    lists:map(fun(P) -> format_path(P) end, maps:get(Key, info(File), [])).
+%% return a list of string
+format_info(Str) when ?IS_PRINTABLE(Str) ->
+    [format("  ~s", [Str])];
+format_info(Is) when is_list(Is) ->
+    lists:map(fun format_info/1, Is);
+format_info(M) when is_map(M) ->
+    maps:fold(fun format_kv/3, [], M);
+format_info(X) ->
+    [format("~s", [X])].
 
-format_path(P) ->
-    format("  ~s", [P]).
+format_kv(K, V, O) ->
+    [format("~s -> ~s", [format("~s", [K]), format("~p", [V])])|O].
 
 %% get info of File
 info(File) ->
@@ -181,6 +191,7 @@ erlang_ts_file(Dir) ->
     F = ex(filename:join(Dir, ".erlang-ts")),
     case filelib:is_regular(F) andalso file:consult(F) of
         {ok, [Cfg]} -> erlang_ts_file(Dir, Cfg);
+        {error, {L, erl_parse, E}} -> error({parse, L, lists:flatten(E)});
         _ -> false
     end.
 
@@ -216,9 +227,9 @@ erlang_ts_file_dirs(Keys, Cfg0) ->
 
 %% Envs is a [{KEY, VAL}], where VAL can be a bash command ("$(CMD)")
 %% or a string. The string can contain vars ("$KEY", where KEY matches
-%% "[a-z0-9-_]*"); the vars will be replaced by their VAL.
+%% "[a-zA-Z0-9-_]*"); the vars will be replaced by their VAL.
 erlang_ts_file_expand(Subj, #{root := Root} = Cfg) ->
-    case {regexp(Subj, "^[$][(]([^)]*)[)]$"), regexp(Subj, "[$]([a-z0-9_-]*)")} of
+    case {regexp(Subj, "^[$][(]([^)]*)[)]$"), regexp(Subj, "[$]([a-zA-Z0-9_-]*)")} of
         {[], []} -> Subj;
         {[Cmd], []} -> erlang_ts_file_sh(Root, Cmd);
         {[], Vars} -> erlang_ts_file_env(Subj, Vars, Cfg);
@@ -237,6 +248,8 @@ erlang_ts_file_env(Subj, Vars, Cfg) ->
 mk_erlang_ts_file_replace(#{env := Env}) ->
     fun(Var, Subj) -> replace(Subj, "[$]"++Var, erlang_ts_file_replacement(Var, Env)) end.
 
+erlang_ts_file_replacement("SELF", _) ->
+    filename:dirname(escript:script_name());
 erlang_ts_file_replacement(Var, Env) ->
     maps:get(list_to_atom(Var), Env).
 

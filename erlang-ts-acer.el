@@ -44,14 +44,16 @@
 
 (defun erlang-ts-acer-init ()
   "Init etsa in current buffer."
-  (etsa--project-name (buffer-file-name))
-  (setq etsa--buffer-srcs (etsa--create-buffer "srcs")
-        etsa--buffer-funs (etsa--create-buffer "funs")
-        etsa--buffer-erls (etsa--create-buffer "erls"))
-  (message "erlang-ts-acer: indexing your erlang code. Will take a few seconds...")
-  (etsa--fill-initial)
-  (etsa--init-ac)
-  (etsa--init-xref))
+  (let ((buf (buffer-file-name)))
+    (when buf
+      (etsa--project-name buf)
+      (setq etsa--buffer-srcs (etsa--create-buffer "srcs")
+            etsa--buffer-funs (etsa--create-buffer "funs")
+            etsa--buffer-erls (etsa--create-buffer "erls"))
+      (message "erlang-ts-acer: indexing your erlang code. Will take a few seconds...")
+      (etsa--fill-initial)
+      (etsa--init-ac)
+      (etsa--init-xref))))
 
 (defun erlang-ts-acer-libs (&optional filename)
   "All libs in the project that FILENAME belongs to."
@@ -73,7 +75,8 @@
 
 (defun etsa--indent ()
   "Try to indent, and return t if point moved."
-  (not (= 0 (indent-according-to-mode))))
+  (let ((r (indent-according-to-mode)))
+    (and r (not (= 0 r)))))
 
 (defun etsa--replace ()
   "Try to replace, and return t if replacement happened."
@@ -81,7 +84,8 @@
 
 (defun etsa--complete ()
   "Try to complete."
-  (auto-complete))
+  (when (member 'auto-complete-mode minor-mode-list)
+    (auto-complete)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; auto-complete framework
