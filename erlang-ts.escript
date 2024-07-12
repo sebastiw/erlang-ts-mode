@@ -358,7 +358,7 @@ erls_in_dir(Dir) ->
     case filelib:is_dir(Dir) of
         false -> [];
         true ->
-            pipe(Dir ++ "/**/*.erl",
+            pipe(Dir ++ "/*.erl",
                  [fun filelib:wildcard/1,
                   fun(X) -> lists:foldl(fun files_filter/2, #{}, X) end,
                   fun(X) -> maps:fold(fun files_format/3, [], X) end,

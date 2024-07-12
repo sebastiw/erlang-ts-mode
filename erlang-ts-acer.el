@@ -50,7 +50,6 @@
       (setq etsa--buffer-srcs (etsa--create-buffer "srcs")
             etsa--buffer-funs (etsa--create-buffer "funs")
             etsa--buffer-erls (etsa--create-buffer "erls"))
-      (message "erlang-ts-acer: indexing your erlang code. Will take a few seconds...")
       (etsa--fill-initial)
       (etsa--init-ac)
       (etsa--init-xref))))
@@ -413,13 +412,22 @@ AI.mod should be completed."
 
 (defun etsa--fill-initial ()
   "Fills buffers."
+  (message "erlang-ts-acer: indexing your erlang code. Will take a few seconds...")
+  (message "bifs...")
   (etsa--fill-bifs)
+  (message "guards...")
   (etsa--fill-guards)
+  (message "words...")
   (etsa--fill-words)
+  (message "otp sources...")
   (etsa--fill-otp-srcs)
+  (message "%s sources..." etsa--project-name)
   (etsa--fill-project-srcs)
+  (message "otp erls...")
   (etsa--fill-erls etsa--buffer-otp-srcs etsa--buffer-otp-erls)
-  (etsa--fill-erls etsa--buffer-srcs etsa--buffer-erls))
+  (message "%s erls..." etsa--project-name)
+  (etsa--fill-erls etsa--buffer-srcs etsa--buffer-erls)
+  (message "Done."))
 
 (defun etsa--fill-otp-srcs ()
   "Populate paths to all directories containing project erls."
