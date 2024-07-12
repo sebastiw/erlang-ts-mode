@@ -432,10 +432,11 @@ AI.mod should be completed."
 
 (defun etsa--fill-erls (pbuff buff)
   "Populate BUFF with paths to all erl files with paths from PBUFF."
-  (let ((paths (etsa--paths pbuff)))
-    (with-current-buffer buff
-      (unless (< 0 (buffer-size))
-        (mapc (lambda(p) (etsa--run-escript "erls" p)) paths)))))
+  (with-current-buffer buff
+    (unless (< 0 (buffer-size))
+      (let* ((srcs (etsa--paths pbuff))
+             (paths (seq-reduce (lambda(s o) (concat s ":" o)) srcs "")))
+        (etsa--run-escript "erls" paths)))))
 
 (defun etsa--fill-funs (ai)
   "Populate all AI.mod's exported functions as per AI.file."

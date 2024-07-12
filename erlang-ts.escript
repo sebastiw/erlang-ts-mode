@@ -14,12 +14,13 @@ dbg({T, L, M, F, R}) -> io:fwrite(standard_error, "~n~p ~s:~s::~w ~p~n", [T, M, 
 
 main(Args) ->
     case Args of
+        []              -> out(ok);
+        ["info", File]  -> out(info(ex(File)));
         ["version"]     -> out(version());
         ["bifs"]        -> out(bifs());
         ["guards"]      -> out(guards());
         ["words"]       -> out(words());
-        ["info", File]  -> io:fwrite("~p~n", [info(ex(File))]);
-        ["erls", File]  -> out(erls(ex(File)));
+        ["erls", Srcs]  -> out(erls(Srcs));
         ["funs", File]  -> out(parse(ex(File)));
         ["man", File]   -> out(man(ex(File)));
         ["name", File]  -> out(info(name, ex(File)));
@@ -336,26 +337,20 @@ man(Root) ->
 man(F, A) ->
     A#{filename:basename(F, ".3") => F}.
 
-%% all relevant files in Root, deduped
-erls(Root) ->
-    case {filelib:is_file(Root), filelib:is_dir(Root)} of
-        {false, false} -> [];
-        {true, false} -> erls_in_dirs(maps:get(srcs, info(Root)));
-        {true, true} -> erls_in_dir(Root)
-    end.
-
-erls_in_dirs(Dirs) ->
-    lists:sort(lists:flatmap(fun erls_in_dir/1, Dirs)).
+%% get all erls in a dir
+erls(Str) ->
+    lists:flatmap(fun erls_in_dir/1, string:tokens(Str, ":")).
 
 erls_in_dir(Dir) ->
-    pipe(Dir ++ "/*.erl",
-         [fun filelib:wildcard/1,
-          fun(X) -> lists:foldl(fun files_filter/2, #{}, X) end,
-          fun(X) -> maps:fold(fun files_format/3, [], X) end,
-          fun lists:sort/1]).
-
-files_format(K, V, A) ->
-    [format("~s=>~s", [K, V])|A].
+    case filelib:is_dir(Dir) of
+        false -> [];
+        true ->
+            pipe(Dir ++ "/**/*.erl",
+                 [fun filelib:wildcard/1,
+                  fun(X) -> lists:foldl(fun files_filter/2, #{}, X) end,
+                  fun(X) -> maps:fold(fun files_format/3, [], X) end,
+                  fun lists:sort/1])
+    end.
 
 files_filter(F, A) ->
     M = filename:basename(F, ".erl"),
@@ -379,6 +374,9 @@ is_file_duplicated(M, F, A) ->
 
 is_file_in_build(F) ->
     re:run(F, "/_build/") =/= nomatch.
+
+files_format(K, V, A) ->
+    [format("~s=>~s", [K, V])|A].
 
 %% reify filename
 ex(File) ->
