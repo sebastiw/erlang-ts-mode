@@ -413,34 +413,29 @@ AI.mod should be completed."
 (defun etsa--fill-initial ()
   "Fills buffers."
   (message "erlang-ts-acer: indexing your erlang code. Will take a few seconds...")
-  (message "bifs...")
-  (etsa--fill-bifs)
-  (message "guards...")
-  (etsa--fill-guards)
-  (message "words...")
-  (etsa--fill-words)
-  (message "otp sources...")
-  (etsa--fill-otp-srcs)
-  (message "%s sources..." etsa--project-name)
-  (etsa--fill-project-srcs)
-  (message "otp erls...")
-  (etsa--fill-erls etsa--buffer-otp-srcs etsa--buffer-otp-erls)
-  (message "%s erls..." etsa--project-name)
-  (etsa--fill-erls etsa--buffer-srcs etsa--buffer-erls)
+  (etsa--with-msg "bifs..." 'etsa--fill-bifs)
+  (etsa--with-msg "guards..." 'etsa--fill-guards)
+  (etsa--with-msg "words..." 'etsa--fill-words)
+  (etsa--with-msg "otp sources..." 'etsa--fill-srcs etsa--buffer-otp-srcs "otp")
+  (etsa--with-msg (concat  etsa--project-name " sources...") 'etsa--fill-srcs etsa--buffer-srcs (buffer-file-name))
+  (etsa--with-msg "otp erls..." 'etsa--fill-erls etsa--buffer-otp-srcs etsa--buffer-otp-erls)
+  (etsa--with-msg (concat etsa--project-name " erls..." ) 'etsa--fill-erls etsa--buffer-srcs etsa--buffer-erls)
   (message "Done."))
 
-(defun etsa--fill-otp-srcs ()
-  "Populate paths to all directories containing project erls."
-  (with-current-buffer etsa--buffer-otp-srcs
-    (unless (< 0 (buffer-size))
-      (etsa--run-escript "srcs" "otp"))))
+(defun etsa--with-msg (msg &rest funargs)
+  "Display MSG, then eval FUNARGS, then redisplay MSG with duration."
+  (let ((t0 (time-convert nil 1000))
+        (with-temp-message msg)
+        (r (eval funargs))
+        (t1 (time-convert nil 1000)))
+    (message (concat msg "(" (format-time-string "%s.%3N" (time-subtract t1 t0)) ")"))
+    r))
 
-(defun etsa--fill-project-srcs ()
-  "Populate paths to all directories containing project erls."
-  (let ((file (buffer-file-name)))
-    (with-current-buffer etsa--buffer-srcs
-      (unless (< 0 (buffer-size))
-        (etsa--run-escript "srcs" file)))))
+(defun etsa--fill-srcs (buff file)
+  "Populate BUFF with src paths from FILE's project."
+  (with-current-buffer buff
+    (unless (< 0 (buffer-size))
+      (etsa--run-escript "srcs" file))))
 
 (defun etsa--fill-erls (pbuff buff)
   "Populate BUFF with paths to all erl files with paths from PBUFF."
