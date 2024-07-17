@@ -12,17 +12,17 @@ make_shadow(Src, Dest) ->
     Count = lists:foldl(mk_cp_app(Dest), 0, appdirs(Src)),
     io:fwrite("copied ~w apps from ~s to ~s.~n", [Count, Src, Dest]).
 
-appdirs(Src) ->    
-    AppSrcPattern = filename:join(Src, "*/src/*.app.src"),
-    AppPattern = filename:join(Src, "*/ebin/*.app"),
-    AppSrcs = filelib:wildcard(AppSrcPattern)++filelib:wildcard(AppPattern),
-    lists:usort(lists:map(fun appdir/1, AppSrcs)).
+appdirs(Src) ->
+    AppSrcPattern = filename:join(Src, "**/src/*.app.src"),
+    AppPattern = filename:join(Src, "**/ebin/*.app"),
+    AppFiles = filelib:wildcard(AppSrcPattern)++filelib:wildcard(AppPattern),
+    lists:usort(lists:map(fun appdir/1, AppFiles)).
 
-appdir(File) ->
-    filename:dirname(filename:dirname(File)).
+appdir(AppFile) ->
+    filename:dirname(filename:dirname(AppFile)).
 
 mk_cp_app(Dest) ->
-    fun(AppSrc, N) -> cp_app(AppSrc, Dest), N+1 end.
+    fun(AppFile, N) -> cp_app(AppFile, Dest), N+1 end.
 
 cp_app(AppDir, Dest) ->
     DestAppDir = filename:join([Dest, filename:basename(AppDir)]),
@@ -31,7 +31,7 @@ cp_app(AppDir, Dest) ->
     appfile(AppDir, Srcs, DestAppDir).
 
 srcs(Src, DestAppDir) ->
-    Srcs = filelib:wildcard(filename:join([Src, src, "**", "*"])),
+    Srcs = filelib:wildcard(filename:join([Src, src, "*"])),
     DestSrcDir = filename:join([DestAppDir, src]),
     lists:map(mk_cp(DestSrcDir, none), Srcs).
 

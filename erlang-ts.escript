@@ -19,6 +19,7 @@ main(Args) ->
         ["bifs"]          -> out(bifs());
         ["guards"]        -> out(guards());
         ["words"]         -> out(words());
+        ["erls"]          -> out(erls(""));
         ["erls", Srcs]    -> out(erls(Srcs));
         ["funs", File]    -> out(parse(ex(File)));
         ["man", File]     -> out(man(ex(File)));
