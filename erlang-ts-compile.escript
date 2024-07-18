@@ -10,8 +10,8 @@ main(Args) ->
     end.
 
 compile_all(R) ->
-    {Root, Erls} = erls(R),
-    results(map_reduce(mk_compile(Root), Erls)).
+    {Root, Srcs} = erls(R),
+    results(map_reduce(mk_compile(Root), Srcs)).
 
 map_reduce(Map, Subjects) ->
     reduce(lists:map(mk_spawn(Map), Subjects)).
@@ -52,10 +52,11 @@ mk_spawn(Mapper) ->
 %% We demand that the directory structure looks like this;
 %% `Root/*/src/**/*.erl' Our parameter R must be absolute. It also
 %% must be one of; 'Root', 'Root/A', 'Root/A/src'
-%% 'Root/A/src/**/M.erl'
+%% 'Root/A/src/**/M.erl'.
+%% We also look for 'X/src/../c_src'.
 erls(R) ->
     case take_first(fun no_srcs/1, src_patterns(R)) of
-        {Root, Erls} -> {Root, Erls};
+        {Root, Srcs} -> {Root, Srcs};
         [] -> []
     end.
 
@@ -63,7 +64,7 @@ erls(R) ->
 no_srcs(Pattern) ->
     case filelib:wildcard(Pattern) of
         [] -> false;
-        Erls -> {root(hd(Erls)), Erls}
+        Erls -> {root(hd(Erls)), Erls++c_src(Erls)}
     end.
 
 take_first(_, []) -> [];
@@ -84,10 +85,22 @@ root(Erl) ->
 %% R must be one of; 'Root', 'Root/A', 'Root/A/src'
 %% 'Root/A/src/**/M.erl'
 src_patterns(R) ->
-    [filename:join([R, '*', src, '**', '*.erl']),
-     filename:join([R, src, '**', '*.erl']),
-     filename:join([R, '**', '*.erl']),
+    [fnjoin([R, '*', src, '**', '*.erl']),
+     fnjoin([R, src, '**', '*.erl']),
+     fnjoin([R, '**', '*.erl']),
      R].
+
+%% find c_src next to the erls, if there is any.
+c_src(Erls) ->
+    CsrcDirs = lists:foldl(fun c_src/2, [], Erls),
+    [{dirname_basename(Csrc), wildname([Csrc, '**', "*.{c,cc}"])} || Csrc <- CsrcDirs].
+
+c_src(Erl, O) ->
+    Candidate = fnjoin([dirname_dirname(Erl), 'c_src']),
+    case filelib:is_dir(Candidate) of
+        true -> [Candidate|O];
+        false -> O
+    end.
 
 mk_compile(Root) ->
     fun(Erl) -> compile(Root, Erl) end.
@@ -95,13 +108,41 @@ mk_compile(Root) ->
 -record(result, {module, erl, beam, errors, warnings, root, incs}).
 -define(RESULT(Mod, Erl, Beam, Es, Ws, Root, Incs),
     #result{module = Mod, erl = Erl, beam = Beam, errors = Es, warnings = Ws, root = Root, incs = Incs}).
+compile(Root, Csrcs) when is_tuple(Csrcs)->
+    cc(Root, Csrcs);
 compile(Root, Erl) ->
-    code:add_pathz(filename:join([Root, gpb, ebin])),
+    code:add_pathz(fnjoin([Root, gpb, ebin])),
     Beam = beamfile(Erl),
+    filelib:ensure_dir(Beam),
     case source_hash(Beam) =:= file_hash(Erl) of
         true -> ?RESULT({mod(Erl)}, Erl, Beam, [], [], Root, []);
         false -> pre_compile(Root, Erl, Beam)
     end.
+
+cc(Root, {"snappyer", Csrcs}) ->
+    cc(Root, snappyer, "snappyer.so", "-std=c++11", Csrcs);
+cc(Root, {"crc32cer", Csrcs}) ->
+    cc(Root, crc32cer, "crc32cer_nif.so", "-std=gnu99 -finline-functions", Csrcs).
+
+cc(Root, App, SO, Flags, Csrcs) ->
+    SOfile = fnjoin([Root, App, priv, SO]),
+    filelib:ensure_dir(SOfile),
+    GccStanza = gcc_stanza(SOfile, Flags, Csrcs),
+    Cmd = flat("~s ; echo $?", [GccStanza]),
+    case os:cmd(Cmd) of
+        "0\n" -> ?RESULT(SOfile, "", "", [], [], Root, GccStanza);
+        Err -> ?RESULT(SOfile, "", "", [lists:filter(fun(C)->C<128 end, Err)], [], Root, GccStanza)
+    end.
+
+gcc_stanza(SOfile, Flags, Csrcs) ->
+    ErlUsr = fnjoin([code:root_dir(), usr]),
+    CC = "gcc -o ~s -shared -fpic -O3 ",
+    Incs = " -I ~s/include -L ~s/lib -lei ",
+    Srcs = lists:flatmap(fun(S) -> " "++S end, Csrcs),
+    flat(CC++Incs++Flags++" ~s", [SOfile, ErlUsr, ErlUsr, Srcs]).
+
+flat(F, As) ->
+    lists:flatten(io_lib:format(F, As)).
 
 pre_compile(Root, Erl, Beam) ->
     Incs = incs(Root, Erl),
@@ -177,11 +218,20 @@ write(Result, Bin) ->
 beamfile(Erl) ->
     dirname_dirname(Erl, [ebin, mod(Erl)++".beam"]).
 
+dirname_basename(F) ->
+    filename:basename(filename:dirname(F)).
+
 dirname_dirname(F, Suffix) ->
-    filename:join([dirname_dirname(F)|Suffix]).
+    fnjoin([dirname_dirname(F)|Suffix]).
 
 dirname_dirname(F) ->
     filename:dirname(filename:dirname(F)).
+
+wildname(Es) ->
+    filelib:wildcard(fnjoin(Es)).
+
+fnjoin(X) ->
+    filename:join(X).
 
 mod(Erl) ->
     filename:basename(Erl, ".erl").

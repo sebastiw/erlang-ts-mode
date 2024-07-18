@@ -456,17 +456,20 @@ AI.mod should be completed."
 (defun etsa--fill-bifs ()
   "Populate bifs buffer."
   (with-current-buffer etsa--buffer-bifs
-    (etsa--run-escript "bifs")))
+    (unless (< 0 (buffer-size))
+      (etsa--run-escript "bifs"))))
 
 (defun etsa--fill-guards ()
   "Populate guards buffer."
   (with-current-buffer etsa--buffer-guards
-    (etsa--run-escript "guards")))
+    (unless (< 0 (buffer-size))
+      (etsa--run-escript "guards"))))
 
 (defun etsa--fill-words ()
   "Populate words buffer."
   (with-current-buffer etsa--buffer-words
-    (etsa--run-escript "words")))
+    (unless (< 0 (buffer-size))
+      (etsa--run-escript "words"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; pretty-printers

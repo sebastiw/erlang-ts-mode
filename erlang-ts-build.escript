@@ -27,19 +27,34 @@ mk_cp_app(Dest) ->
 cp_app(AppDir, Dest) ->
     DestAppDir = filename:join([Dest, filename:basename(AppDir)]),
     Srcs = srcs(AppDir, DestAppDir),
+    c_srcs(AppDir, DestAppDir),
     incs(AppDir, DestAppDir),
+    makefile(AppDir, DestAppDir),
     appfile(AppDir, Srcs, DestAppDir).
 
-srcs(Src, DestAppDir) ->
-    Srcs = filelib:wildcard(filename:join([Src, src, "*"])),
+srcs(AppDir, DestAppDir) ->
+    Srcs = filelib:wildcard(filename:join([AppDir, src, "*"])),
     DestSrcDir = filename:join([DestAppDir, src]),
     lists:map(mk_cp(DestSrcDir, none), Srcs).
 
-incs(Src, DestAppDir) ->
-    SrcPrefix = filename:join([Src, include]),
+incs(AppDir, DestAppDir) ->
+    SrcPrefix = filename:join([AppDir, include]),
     Incs = filelib:wildcard(filename:join([SrcPrefix, "**", "*"])),
     DestIncDir = filename:join([DestAppDir, include]),
     lists:map(mk_cp(DestIncDir, SrcPrefix), Incs).
+
+c_srcs(AppDir, DestAppDir) ->
+    SrcPrefix = filename:join([AppDir, c_src]),
+    Csrcs = filelib:wildcard(filename:join([SrcPrefix, "**", "*"])),
+    DestCsrcDir = filename:join([DestAppDir, c_src]),
+    lists:map(mk_cp(DestCsrcDir, SrcPrefix), Csrcs).
+
+makefile(AppDir, DestAppDir) ->
+    Makefile = filename:join([AppDir, 'Makefile']),
+    case filelib:is_regular(Makefile) of
+        true -> cp(Makefile, DestAppDir);
+        false -> ok
+    end.
 
 mk_cp(Dest, Prefix) ->
     fun(Src) -> cp(Src, add_suffix(Src, Dest, Prefix)) end.
@@ -96,7 +111,14 @@ app_items(Adescr, Srcs) ->
           fun app_version/1]).
 
 app_version(AppDescr) ->
-    lists:keystore(vsn, 1, AppDescr, {vsn, "0.0.0"}).
+    case lists:keytake(vsn, 1, AppDescr) of
+        false ->  [{vsn, "0.0.0"}|AppDescr];
+        {value, {vsn, Vsn}, AD} ->
+            case re:run(Vsn, "^([a-z0-9]+|[0-9]+(\.[0-9])+)$") of
+                nomatch -> AppDescr;
+                _ -> [{vsn, "0.0.0"}|AD]
+            end
+    end.
 
 mk_add_item(K, V) ->
     fun(X) -> lists:keystore(K, 1, X, {K, V}) end.
