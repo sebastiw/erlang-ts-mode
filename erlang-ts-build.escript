@@ -80,14 +80,26 @@ appfile(AppDir, Srcs, DestDir) ->
         {true, false} ->
             DestAppFileName = filename:join([DestEbin, filename:basename(AppSrcFileName, ".src")]),
             {ok, [{application, Aname, Adesc}]} = file:consult(AppSrcFileName),
-            Mods = lists:foldl(fun filename_to_mod/2, [], Srcs),
-            A = {application, Aname, lists:keystore(modules, 1, Adesc, {modules, Mods})},
+            A = {application, Aname, app_items(Adesc, Srcs)},
             Descr = iolist_to_binary(io_lib:format("~p.~n", [A])),
             case ok == filelib:ensure_dir(DestAppFileName) andalso file:write_file(DestAppFileName, Descr) of
                 ok -> ok;
                 Err -> error({DestAppFileName, Err})
             end
     end.
+
+app_items(Adescr, Srcs) ->
+    Mods = lists:foldl(fun filename_to_mod/2, [], Srcs),
+    pipe(Adescr,
+         [mk_add_item(modules, Mods),
+          mk_add_item(registered, []),
+          fun app_version/1]).
+
+app_version(AppDescr) ->
+    lists:keystore(vsn, 1, AppDescr, {vsn, "0.0.0"}).
+
+mk_add_item(K, V) ->
+    fun(X) -> lists:keystore(K, 1, X, {K, V}) end.
 
 filename_to_mod(Src, O) ->
     case filename:extension(Src) of
@@ -100,3 +112,6 @@ do_cp(Src, Dest) ->
         {ok, _} -> filename:basename(Src);
         Err -> error({copy, Src, Dest, Err})
     end.
+
+pipe(S, Fs) ->
+    lists:foldl(fun(F, Z) -> F(Z) end, S, Fs).
