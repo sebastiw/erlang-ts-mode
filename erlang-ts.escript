@@ -13,24 +13,30 @@ dbg({T, L, M, F, R}) -> io:fwrite(standard_error, "~n~p ~s:~s::~w ~p~n", [T, M, 
 -define('?'(C, A, B), case ?'??'(C) of true -> ?'??'(A); _ -> ?'??'(B) end).
 
 main(Args) ->
-    case Args of
-        []                -> out(ok);
-        ["version"]       -> out(version());
-        ["bifs"]          -> out(bifs());
-        ["guards"]        -> out(guards());
-        ["words"]         -> out(words());
-        ["erls"]          -> out(erls(""));
-        ["erls", Srcs]    -> out(erls(Srcs));
-        ["funs", File]    -> out(parse(ex(File)));
-        ["man", File]     -> out(man(ex(File)));
-        ["srcs", "otp"]   -> out(info(srcs, otp()));
-        ["srcs", File]    -> out(info(srcs, ex(File)));
-        ["incs", File]    -> out(info(incs, ex(File)));
-        ["libs", File]    -> out(info(libs, ex(File)));
-        ["name", File]    -> out(info(name, ex(File)));
-	["info", File]    -> out(info(all , ex(File)));
-        ["info", K, File] -> out(info(list_to_atom(K), ex(File)))
+    try
+        handle(Args)
+    catch
+        C:R:S ->
+            io:fwrite("error: ~s:~p (~p)~n~p~n", [C, R, Args, S]),
+            halt(33)
     end.
+
+handle([])                -> out(ok);
+handle(["version"])       -> out(version());
+handle(["bifs"])          -> out(bifs());
+handle(["guards"])        -> out(guards());
+handle(["words"])         -> out(words());
+handle(["erls"])          -> out(erls(""));
+handle(["erls", Srcs])    -> out(erls(Srcs));
+handle(["funs", File])    -> out(parse(ex(File)));
+handle(["man", File])     -> out(man(ex(File)));
+handle(["srcs", "otp"])   -> out(info(srcs, otp()));
+handle(["srcs", File])    -> out(info(srcs, ex(File)));
+handle(["incs", File])    -> out(info(incs, ex(File)));
+handle(["libs", File])    -> out(info(libs, ex(File)));
+handle(["name", File])    -> out(info(name, ex(File)));
+handle(["info", File])    -> out(info(all , ex(File)));
+handle(["info", K, File]) -> out(info(list_to_atom(K), ex(File))).
 
 %% print string or list of strings.
 -define(IS_PRINTABLE(X), is_integer(hd(X)); is_atom(X)).
@@ -239,8 +245,8 @@ erlang_ts_file_expand(Subj, #{root := Root} = Cfg) ->
 
 erlang_ts_file_sh(WorkDir, Cmd) ->
     case sh(WorkDir, Cmd) of
-        R when 0 < length(R) -> lists:last(R);
-        [] -> []
+        {ok, R} when 0 < length(R) -> lists:last(R);
+        {error, Err} -> error({sh, Err})
     end.
 
 erlang_ts_file_env(Subj, Vars, Cfg) ->
@@ -257,9 +263,10 @@ erlang_ts_file_replacement(Var, Env) ->
 %% wrap os:cmd
 sh(WorkingDir, Cmd) ->
     C = io_lib:format("cd ~s && ~s ; printf 'x%s\n' $?", [WorkingDir, Cmd]),
-    case lists:reverse(os:cmd(C)) of
-        "\n0x"++R -> string:tokens(lists:reverse(R), "\n");
-        R -> error({sh, lists:reverse(R)})
+    R = os:cmd(C),
+    case lists:reverse(R) of
+        "\n0x\n"++O -> {ok, string:tokens(lists:reverse(O), "\n")};
+        _ -> {error, R}
     end.
 
 %% wrap re:replace
@@ -325,9 +332,11 @@ dedupe_untag(Ps) ->
 %% Look for Target in path of File. Return Path or 'false'.
 look_above(Target, File) ->
     Dir = ?'?'(filelib:is_dir(File), File, filename:dirname(File)),
-    try lists:foldl(mk_look_above(Target), "/", string:tokens(Dir, "/")),
+    try
+        lists:foldl(mk_look_above(Target), "/", string:tokens(Dir, "/")),
         false
-    catch throw:D -> D
+    catch
+        throw:D -> D
     end.
 
 mk_look_above(Target) ->

@@ -153,6 +153,7 @@ pre_compile(Root, Erl, Beam) ->
 
 compile(Root, Erl, Beam, Incs) ->
     Opts = opts(Erl, Incs),
+    epp:parse_file(Erl, Opts),
     case compile:file(Erl, Opts) of
         {ok, Mod, Bin} -> write(?RESULT(Mod, Erl, Beam, [], [], Root, Incs), Bin);
         {ok, Mod, Bin, Ws} -> write(?RESULT(Mod, Erl, Beam, [], unroll_reports(Ws), Root, Incs), Bin);

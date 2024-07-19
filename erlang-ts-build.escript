@@ -3,10 +3,16 @@
 -mode(compile).
 
 main(Args) ->
-    case Args of
-        [] -> io:fwrite("$0 cp SRC DEST - copy all apps under SRC to DEST.~n", []);
-        ["cp", Src, Dest] -> make_shadow(Src, Dest)
+    try
+        handle(Args)
+    catch
+        C:R:S ->
+            io:fwrite("error: ~s:~p (~p)~n~p~n", [C, R, Args, S]),
+            halt(34)
     end.
+
+handle([]) -> io:fwrite("$0 cp SRC DEST - copy all apps under SRC to DEST.~n", []);
+handle(["cp", Src, Dest]) -> make_shadow(Src, Dest).
 
 make_shadow(Src, Dest) ->
     Count = lists:foldl(mk_cp_app(Dest), 0, appdirs(Src)),
@@ -114,7 +120,7 @@ app_version(AppDescr) ->
     case lists:keytake(vsn, 1, AppDescr) of
         false ->  [{vsn, "0.0.0"}|AppDescr];
         {value, {vsn, Vsn}, AD} ->
-            case re:run(Vsn, "^([a-z0-9]+|[0-9]+(\.[0-9])+)$") of
+            case catch re:run(Vsn, "^([a-z0-9]+|[0-9]+(\.[0-9])+)$") of
                 nomatch -> AppDescr;
                 _ -> [{vsn, "0.0.0"}|AD]
             end
