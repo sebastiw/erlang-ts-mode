@@ -2,6 +2,12 @@
 
 -mode(compile).
 
+%% debugging
+-compile({nowarn_unused_function, [dbg/1]}).
+dbg({error, L, M, F, R}) -> error({L, M, F, R});
+dbg({T, L, M, F, R}) -> io:fwrite(standard_error, "~n~p ~s:~s::~w ~p~n", [T, M, F, L, R]), R.
+-define(DBG(Tag, X), dbg({Tag, ?LINE, ?MODULE, ?FUNCTION_NAME, X})).
+
 main(Args) ->
     case Args of
         [] -> io:fwrite("$0 compile SRC - compile SRC, or all files under SRC.~n", []);
@@ -153,7 +159,6 @@ pre_compile(Root, Erl, Beam) ->
 
 compile(Root, Erl, Beam, Incs) ->
     Opts = opts(Erl, Incs),
-    epp:parse_file(Erl, Opts),
     case compile:file(Erl, Opts) of
         {ok, Mod, Bin} -> write(?RESULT(Mod, Erl, Beam, [], [], Root, Incs), Bin);
         {ok, Mod, Bin, Ws} -> write(?RESULT(Mod, Erl, Beam, [], unroll_reports(Ws), Root, Incs), Bin);

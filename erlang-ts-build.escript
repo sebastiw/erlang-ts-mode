@@ -30,9 +30,9 @@ mk_cp_app(Dest) ->
 cp_app(AppDir, Dest) ->
     DestAppDir = filename:join([Dest, filename:basename(AppDir)]),
     Srcs = srcs(AppDir, DestAppDir),
-    c_srcs(AppDir, DestAppDir),
-    incs(AppDir, DestAppDir),
-    makefile(AppDir, DestAppDir),
+    extra(c_srcs, AppDir, DestAppDir),
+    extra(incs, AppDir, DestAppDir),
+    extra(privs, AppDir, DestAppDir),
     appfile(AppDir, Srcs, DestAppDir).
 
 srcs(AppDir, DestAppDir) ->
@@ -40,24 +40,11 @@ srcs(AppDir, DestAppDir) ->
     DestSrcDir = filename:join([DestAppDir, src]),
     lists:map(mk_cp(DestSrcDir, none), Srcs).
 
-incs(AppDir, DestAppDir) ->
-    SrcPrefix = filename:join([AppDir, include]),
-    Incs = filelib:wildcard(filename:join([SrcPrefix, "**", "*"])),
-    DestIncDir = filename:join([DestAppDir, include]),
-    lists:map(mk_cp(DestIncDir, SrcPrefix), Incs).
-
-c_srcs(AppDir, DestAppDir) ->
-    SrcPrefix = filename:join([AppDir, c_src]),
-    Csrcs = filelib:wildcard(filename:join([SrcPrefix, "**", "*"])),
-    DestCsrcDir = filename:join([DestAppDir, c_src]),
-    lists:map(mk_cp(DestCsrcDir, SrcPrefix), Csrcs).
-
-makefile(AppDir, DestAppDir) ->
-    Makefile = filename:join([AppDir, 'Makefile']),
-    case filelib:is_regular(Makefile) of
-        true -> cp(Makefile, DestAppDir);
-        false -> ok
-    end.
+extra(Dir, AppDir, DestAppDir) ->
+    SrcPrefix = filename:join([AppDir, Dir]),
+    Xs = filelib:wildcard(filename:join([SrcPrefix, "**", "*"])),
+    DestDir = filename:join([DestAppDir, Dir]),
+    lists:map(mk_cp(DestDir, SrcPrefix), Xs).
 
 mk_cp(Dest, Prefix) ->
     fun(Src) -> cp(Src, add_suffix(Src, Dest, Prefix)) end.
