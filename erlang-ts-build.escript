@@ -19,13 +19,10 @@ make_shadow(Src, Dest) ->
     io:fwrite("copied ~w apps from ~s to ~s.~n", [Count, Src, Dest]).
 
 appdirs(Src) ->
-    AppSrcPattern = filename:join(Src, "**/src/*.app.src"),
-    AppPattern = filename:join(Src, "**/ebin/*.app"),
+    AppSrcPattern = filename:join(Src, "*/src/*.app.src"),
+    AppPattern = filename:join(Src, "*/ebin/*.app"),
     AppFiles = filelib:wildcard(AppSrcPattern)++filelib:wildcard(AppPattern),
-    lists:usort(lists:map(fun appdir/1, AppFiles)).
-
-appdir(AppFile) ->
-    filename:dirname(filename:dirname(AppFile)).
+    lists:usort(lists:map(fun dirname_dirname/1, AppFiles)).
 
 mk_cp_app(Dest) ->
     fun(AppFile, N) -> cp_app(AppFile, Dest), N+1 end.
@@ -128,6 +125,9 @@ app_version(AppDescr) ->
 
 mk_add_item(K, V) ->
     fun(X) -> lists:keystore(K, 1, X, {K, V}) end.
+
+dirname_dirname(File) ->
+    filename:dirname(filename:dirname(File)).
 
 filename_to_mod(Src, O) ->
     case filename:extension(Src) of
