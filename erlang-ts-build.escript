@@ -36,7 +36,7 @@ cp_app(AppDir, Dest) ->
     appfile(AppDir, Srcs, DestAppDir).
 
 srcs(AppDir, DestAppDir) ->
-    Srcs = filelib:wildcard(filename:join([AppDir, src, "*"])),
+    Srcs = filelib:wildcard(filename:join([AppDir, src, "**", "*"])),
     DestSrcDir = filename:join([DestAppDir, src]),
     lists:map(mk_cp(DestSrcDir, none), Srcs).
 
