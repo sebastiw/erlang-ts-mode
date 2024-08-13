@@ -59,7 +59,7 @@
   "Map NODE to `(fdecl NAME A LINE ARGS)."
   (let* ((name (etst--txt (etst--child "name" node)))
          (args (etst--extract-args node))
-         (arity (number-to-string (length args)))
+         (arity (etst--extract-arity node))
          (line (line-number-at-pos (treesit-node-start node))))
     `(fdecl ,name ,arity ,line ,args)))
 
@@ -68,7 +68,7 @@
   "If NODE is a `call', return (local-call F A Args) or (remote-call M F A Args)."
   (let* ((expr (etst--child "expr" node))
          (args (etst--extract-args node))
-         (arity (number-to-string (length args)))
+         (arity (etst--extract-arity node))
          (query '((remote (remote_module (atom) @m) (atom) @f))))
     (pcase (treesit-query-capture expr query)
       ('nil
@@ -76,20 +76,22 @@
       (`((m . ,m) (f . ,f))
        (list 'remote-call (etst--txt m) (etst--txt f) arity args)))))
 
-(defun etst--extract-args (node)
-  "If NODE has an `args', return ARGS as a list of strings."
+(defun etst--extract-arity (node)
+  "If NODE has an `args', return length of ARGS as a string."
   (pcase (etst--child "args" node)
     ('nil nil)
-    (n (etst--map-children #'etst--txt n))))
+    (node (number-to-string (length (treesit-node-children node t))))))
+
+(defun etst--extract-args (node)
+  "If NODE has an `args', return comma-separated ARGS as a string."
+  (pcase (etst--child "args" node)
+    ('nil nil)
+    (node (mapconcat #'etst--txt (treesit-node-children node t) ", "))))
 
 ;; utils
 (defun etst--fold-children (fun node)
   "Fold FUN over the children of NODE."
   (seq-reduce fun (treesit-node-children node) nil))
-
-(defun etst--map-children (fun node)
-  "Map named children of NODE with FUN."
-  (mapcar fun (treesit-node-children node t)))
 
 (defun etst--single-child (field node)
   "Return FIELD attribute of NODE."

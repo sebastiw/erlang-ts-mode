@@ -31,8 +31,8 @@ cp_app(AppDir, Dest) ->
     DestAppDir = filename:join([Dest, filename:basename(AppDir)]),
     Srcs = srcs(AppDir, DestAppDir),
     extra(c_srcs, AppDir, DestAppDir),
-    extra(incs, AppDir, DestAppDir),
-    extra(privs, AppDir, DestAppDir),
+    extra(include, AppDir, DestAppDir),
+    extra(priv, AppDir, DestAppDir),
     appfile(AppDir, Srcs, DestAppDir).
 
 srcs(AppDir, DestAppDir) ->

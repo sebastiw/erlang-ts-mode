@@ -11,46 +11,45 @@ dbg({T, L, M, F, R}) -> io:fwrite(standard_error, "~n~p ~s:~s::~w ~p~n", [T, M, 
 main(Args) ->
     case Args of
         [] -> io:fwrite("$0 compile SRC - compile SRC, or all files under SRC.~n", []);
-        ["compile", Root] -> compile_all(Root);
+        ["compile", R] -> compile_all(R);
         _ -> main([])
     end.
 
+%% We compile in parallel; each file is compiled in a separate
+%% process. Trying to figure out the dependency grph is silly; if the
+%% compilation fails due to a missing dependency we defer and
+%% recompile when the dependency appears.
 compile_all(R) ->
-    {Root, Srcs} = erls(R),
-    results(map_reduce(mk_compile(Root), Srcs)).
+    pipe(erls(R),
+         [fun({Root, Srcs}) -> {mk_compile(Root), Srcs} end,
+          fun({F, Srcs}) -> map_reduce(F, Srcs) end,
+          fun results/1]).
 
 map_reduce(Map, Subjects) ->
     reduce(lists:map(mk_spawn(Map), Subjects)).
 
-reduce(Refs) ->
-    timer:send_after(2000, tick),
-    redc(#{t0 => millis_now(), workers => Refs, results => []}).
-
 -define(DOWN(Pid, Ref, X), {'DOWN', Ref, process, Pid, X}).
-redc(#{workers := [], results := O}) -> O;
-redc(Z) ->
+reduce(#{workers := [], results := O}) -> O;
+reduce(Z) when is_map(Z) ->
     receive
-        tick -> redc(tick(Z));
-        ?DOWN(Pid, Ref, X) -> redc(redc_update({Pid, Ref}, X, Z))
-    end.
+        tick -> reduce(tick(Z));
+        ?DOWN(Pid, Ref, X) -> reduce(reduce_update({Pid, Ref}, X, Z))
+    end;
+reduce(Refs) when is_list(Refs) ->
+    timer:send_after(2000, tick),
+    reduce(#{t0 => millis_now(), workers => Refs, results => []}).
+
+-define(MAPS_UPDATE_WITH(K, V, F),
+    fun(X) -> maps:update_with(K, fun(V) -> F end, X) end).
+reduce_update(PidRef, {S, Data}, Z) ->
+    pipe(Z,
+         [?MAPS_UPDATE_WITH(workers, P, P--[{S, PidRef}]),
+          ?MAPS_UPDATE_WITH(results, P, [Data|P])]).
 
 tick(#{t0 := T0, workers := Ws, results := Rs} = X) ->
     timer:send_after(2000, tick),
     io:fwrite("reducing: ~w/~w (~w)~n", [length(Rs), length(Ws), (millis_now()-T0)/1000]),
     X.
-
-millis_now() ->
-    erlang:system_time(millisecond).
-
--define(MAPS_UPDATE_WITH(K, V, F),
-    fun(X) -> maps:update_with(K, fun(V) -> F end, X) end).
-redc_update(PidRef, {S, Data}, Z) ->
-    pipe(Z,
-         [?MAPS_UPDATE_WITH(workers, P, P--[{S, PidRef}]),
-          ?MAPS_UPDATE_WITH(results, P, [Data|P])]).
-
-pipe(A0, Fs) ->
-    lists:foldl(fun(F, A) -> F(A) end, A0, Fs).
 
 mk_spawn(Mapper) ->
     fun(S) -> {S, erlang:spawn_monitor(fun() -> exit({S, Mapper(S)}) end)} end.
@@ -60,24 +59,17 @@ mk_spawn(Mapper) ->
 %% must be one of; 'Root', 'Root/A', 'Root/A/src'
 %% 'Root/A/src/**/M.erl'.
 %% We also look for 'X/src/../c_src'.
+
 erls(R) ->
-    case take_first(fun no_srcs/1, src_patterns(R)) of
-        {Root, Srcs} -> {Root, Srcs};
-        [] -> []
+    try take_first(fun root_srcs/1, src_patterns(R))
+    catch throw:nothing -> []
     end.
 
 %% return `false' if there are no erls, otherwise a list of erls.
-no_srcs(Pattern) ->
+root_srcs(Pattern) ->
     case filelib:wildcard(Pattern) of
-        [] -> false;
+        [] -> throw(nothing);
         Erls -> {root(hd(Erls)), Erls++c_src(Erls)}
-    end.
-
-take_first(_, []) -> [];
-take_first(F, [P|Patterns]) ->
-    case F(P) of
-        false -> take_first(F, Patterns);
-        V -> V
     end.
 
 root(Erl) ->
@@ -88,8 +80,13 @@ root(Erl) ->
         nomatch -> []
     end.
 
-%% R must be one of; 'Root', 'Root/A', 'Root/A/src'
-%% 'Root/A/src/**/M.erl'
+%% We require a src to match 'Root/*/src/**/*.erl'.
+%% R must be one of;
+%%    'Root'
+%%    'Root/A'
+%%    'Root/A/src'
+%%    'Root/A/src/M.erl'
+%% Return a list of the 4 possible patterns.
 src_patterns(R) ->
     [fnjoin([R, '*', src, '**', '*.erl']),
      fnjoin([R, src, '**', '*.erl']),
@@ -108,7 +105,9 @@ c_src(Erl, O) ->
         false -> O
     end.
 
+%% teh compiler
 mk_compile(Root) ->
+    lists:foreach(fun code:add_pathz/1, wildname([Root, '*', ebin])),
     fun(Erl) -> compile(Root, Erl) end.
 
 -record(result, {module, erl, beam, errors, warnings, root, incs}).
@@ -117,13 +116,14 @@ mk_compile(Root) ->
 compile(Root, Csrcs) when is_tuple(Csrcs)->
     cc(Root, Csrcs);
 compile(Root, Erl) ->
-    code:add_pathz(fnjoin([Root, gpb, ebin])),
     Beam = beamfile(Erl),
     filelib:ensure_dir(Beam),
     case source_hash(Beam) =:= file_hash(Erl) of
         true -> ?RESULT({mod(Erl)}, Erl, Beam, [], [], Root, []);
-        false -> pre_compile(Root, Erl, Beam)
+        false -> compile(Root, Erl, Beam)
     end.
+
+%% teh C compiler. Just runs gcc.
 
 cc(Root, {"snappyer", Csrcs}) ->
     cc(Root, snappyer, "snappyer.so", "-std=c++11", Csrcs);
@@ -147,10 +147,8 @@ gcc_stanza(SOfile, Flags, Csrcs) ->
     Srcs = lists:flatmap(fun(S) -> " "++S end, Csrcs),
     flat(CC++Incs++Flags++" ~s", [SOfile, ErlUsr, ErlUsr, Srcs]).
 
-flat(F, As) ->
-    lists:flatten(io_lib:format(F, As)).
-
-pre_compile(Root, Erl, Beam) ->
+%% the erl compiler
+compile(Root, Erl, Beam) ->
     Incs = incs(Root, Erl),
     case pre_compile(Erl, Incs) of
         [] -> compile(Root, Erl, Beam, Incs);
@@ -221,8 +219,49 @@ write(Result, Bin) ->
         {error, Err} -> Result#result{errors = [{write, Err}]}
     end.
 
-beamfile(Erl) ->
-    dirname_dirname(Erl, [ebin, mod(Erl)++".beam"]).
+results(Rs) ->
+    pipe(Rs,
+         [mk_results(success_cached),
+          mk_results(success),
+          mk_results(warnings),
+          mk_results(errors),
+          fun([]) -> done end]).
+
+mk_results(W) ->
+    fun(Rs) -> results(W, Rs) end.
+
+results(W, Rs) ->
+    {Prints, Rest} = lists:foldr(mk_split_result(W), {[], []}, Rs),
+    result_write(W, Prints),
+    Rest.
+
+result_write(W, Prints) ->
+    case {lists:member(W, [warnings, errors]), length(Prints)} of
+        {_, 0}     -> ok;
+        {true, _}  -> lists:foreach(fun(S) -> io:fwrite("~s: ~s~n", [W, S]) end, Prints);
+        {false, L} -> io:fwrite("~s: ~w~n", [W, L])
+    end.
+
+mk_split_result(W) ->
+    fun(R, {L1, L2}) -> split_result(W, R, L1, L2) end.
+
+split_result(W, R, L1, L2) ->
+    case result(W, R) of
+        miss -> {L1, [R|L2]};
+        V -> {[V|L1], L2}
+    end.
+
+result(Level, ?RESULT(Mod, Erl, _, Es, Ws, _, Incs)) ->
+    case {Level, length(Es), length(Ws), Mod} of
+        {success_cached, 0, 0, {M}}    -> io_lib:format("~s~n", [M]);
+        {success, 0, 0, _}             -> io_lib:format("~s~n", [Mod]);
+        {warnings, 0, W, _} when 0 < W -> io_lib:format("~s~n~p~n", [Erl, Ws]);
+        {errors, E, _, _} when 0 < E   -> io_lib:format("~s~n~p~n~p~n", [Erl, Incs, Es]);
+        _ -> miss
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% utils
 
 dirname_basename(F) ->
     filename:basename(filename:dirname(F)).
@@ -239,22 +278,25 @@ wildname(Es) ->
 fnjoin(X) ->
     filename:join(X).
 
+beamfile(Erl) ->
+    dirname_dirname(Erl, [ebin, mod(Erl)++".beam"]).
+
 mod(Erl) ->
     filename:basename(Erl, ".erl").
 
-results(Rs) ->
-    (mk_results(success))(Rs),
-    (mk_results(warnings))(Rs),
-    (mk_results(errors))(Rs).
-
-mk_results(W) ->
-    fun(Rs) -> lists:foreach(fun(R) -> result(W, R) end, Rs) end.
-
-result(Level, ?RESULT(Mod, Erl, _, Es, Ws, _, Incs)) ->
-    case {Level, length(Es), length(Ws), Mod} of
-        {success, 0, 0, {M}} -> io:fwrite("Success (cached): ~s~n", [M]);
-        {success, 0, 0, _} -> io:fwrite("Success: ~s~n", [Mod]);
-        {warnings, 0, W, _} when 0 < W -> io:fwrite("Success: ~s~n~p~n", [Erl, Ws]);
-        {errors, E, _, _} when 0 < E -> io:fwrite("Fail: ~s~n~p~n~p~n", [Erl, Incs, Es]);
-        _ -> ok
+%% Call F(I) on each element in Is until we find an V = F(I) that does
+%% not throw an exception. Return V or throw(nothing).
+take_first(_, []) -> throw(nothing);
+take_first(F, [P|Patterns]) ->
+    try F(P)
+    catch _:_ -> take_first(F, Patterns)
     end.
+
+flat(F, As) ->
+    lists:flatten(io_lib:format(F, As)).
+
+millis_now() ->
+    erlang:system_time(millisecond).
+
+pipe(A0, Fs) ->
+    lists:foldl(fun(F, A) -> F(A) end, A0, Fs).

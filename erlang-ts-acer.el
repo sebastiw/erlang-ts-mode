@@ -165,7 +165,7 @@
   "Return start pos of thing if it is `\#rec'."
   (etsa--match-left "#'?[a-z][a-zA-Z0-9_]*"))
 
-;; candidate finders
+;; candidate finders for autocomplete
 (defun etsa--candidates-mfa ()
   "Get m:f( candidates."
   (let* ((ai (etsa--item-from-string-mfa ac-prefix))
@@ -265,7 +265,6 @@ AI.mod and AI.fun should be completed."
              (arity (etsa--item-arity ai))
              (file (etsa--item-file ai))
              (mfa (concat mod ":" fun "/" arity))
-             (buffs (list etsa--buffer-erls etsa--buffer-otp-erls))
              (ais))
         (etsa--fill-funs ai)
         (with-current-buffer etsa--buffer-funs
@@ -294,9 +293,10 @@ AI.mod should be completed."
 (defun etsa--expand-f-to-a (ai)
   "Return list of `etsa--item' with things that complete AI.
 AI.mod is ignored, AI.fun is completed."
-  (append (etsa--expand-f-to-a-local ai)
-          (etsa--expand-f-to-a-imports ai)
-          (etsa--expand-f-to-a-bifs ai)))
+  (append
+   (etsa--expand-f-to-a-local ai)
+   (etsa--expand-f-to-a-imports ai)
+   (etsa--expand-f-to-a-bifs ai)))
 
 (defun etsa--expand-f-to-a-local (ai)
   "Return list of `etsa--item' by completing AI in local buffer.
@@ -585,7 +585,7 @@ DIR is `right'), or bol and eol (otherwise)."
      (etsa--make-item m f))))
 
 (defun etsa--item-from-string-fa (str)
-  "Return `avcer-item' from `f\(' STR."
+  "Return `etsa-item' from `f\(' STR."
   (pcase (split-string str "[()]" t)
     (`(,f)
      (etsa--make-item nil f))))
