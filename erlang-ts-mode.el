@@ -30,6 +30,7 @@
 ;; load our subsystems
 (require 'erlang-ts-acer nil t)
 (require 'erlang-ts-defun nil t)
+(require 'erlang-ts-fill nil t)
 (require 'erlang-ts-flycheck nil t)
 (require 'erlang-ts-fontlock nil t)
 (require 'erlang-ts-imenu nil t)
@@ -79,12 +80,11 @@
   (when (zerop (buffer-size))
     (run-hooks 'erlang-ts-new-file-hook))
 
-  (require 'erlang-ts-fill)
   (setq-local
    fill-paragraph-function 'erlang-ts-fill)
 
   (erlang-ts-acer-init)
-
+  (erlang-ts-flycheck-init)
   (treesit-major-mode-setup))
 
 (defgroup erlang-ts nil

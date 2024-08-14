@@ -15,18 +15,31 @@ main(Args) ->
         _ -> main([])
     end.
 
-%% We compile in parallel; each file is compiled in a separate
-%% process. Trying to figure out the dependency grph is silly; if the
-%% compilation fails due to a missing dependency we defer and
-%% recompile when the dependency appears.
+%% We compile in parallel; each file is compiled in a separate process
+%% (a.k.a. map-reduce). Trying to figure out the dependency grph is
+%% silly; if the compilation fails due to a missing dependency we
+%% defer and recompile when the dependency appears.
 compile_all(R) ->
     pipe(erls(R),
-         [fun({Root, Srcs}) -> {mk_compile(Root), Srcs} end,
-          fun({F, Srcs}) -> map_reduce(F, Srcs) end,
+         [fun compiler_map/1,
+          fun compiler_reduce/1,
           fun results/1]).
 
-map_reduce(Map, Subjects) ->
-    reduce(lists:map(mk_spawn(Map), Subjects)).
+%% map each file to a process. Also add all our ebins to the path so
+%% we can find behaviours.
+compiler_map({Root, Subjects}) ->
+    io:fwrite("compiling: ~w files~n", [length(Subjects)]),
+    lists:foreach(fun code:add_pathz/1, wildname([Root, '*', ebin])),
+    #{t0 => millis_now(), workers => lists:map(mk_compile(Root), Subjects), results => []}.
+
+mk_compile(Root) ->
+    fun(S) -> {S, erlang:spawn_monitor(fun() -> exit({S, compile(Root, S)}) end)} end.
+
+%% reduce the compilation results. Print a progress report every Tick
+%% seconds.
+compiler_reduce(Z) ->
+    timer:send_after(2000, tick),
+    reduce(Z).
 
 -define(DOWN(Pid, Ref, X), {'DOWN', Ref, process, Pid, X}).
 reduce(#{workers := [], results := O}) -> O;
@@ -34,10 +47,7 @@ reduce(Z) when is_map(Z) ->
     receive
         tick -> reduce(tick(Z));
         ?DOWN(Pid, Ref, X) -> reduce(reduce_update({Pid, Ref}, X, Z))
-    end;
-reduce(Refs) when is_list(Refs) ->
-    timer:send_after(2000, tick),
-    reduce(#{t0 => millis_now(), workers => Refs, results => []}).
+    end.
 
 -define(MAPS_UPDATE_WITH(K, V, F),
     fun(X) -> maps:update_with(K, fun(V) -> F end, X) end).
@@ -48,11 +58,17 @@ reduce_update(PidRef, {S, Data}, Z) ->
 
 tick(#{t0 := T0, workers := Ws, results := Rs} = X) ->
     timer:send_after(2000, tick),
-    io:fwrite("reducing: ~w/~w (~w)~n", [length(Rs), length(Ws), (millis_now()-T0)/1000]),
+    io:fwrite("working: ~w/~w (~w)~s~n", [length(Rs), length(Ws), duration(T0), workers(Ws)]),
     X.
 
-mk_spawn(Mapper) ->
-    fun(S) -> {S, erlang:spawn_monitor(fun() -> exit({S, Mapper(S)}) end)} end.
+duration(T0) ->
+    (millis_now()-T0)/1000.
+
+workers(Ws) ->
+    case length(Ws) < 4 of
+        true -> flat(" [~s]", [string:join([mod(F) || {F, _} <- Ws], ", ")]);
+        false -> ""
+    end.
 
 %% We demand that the directory structure looks like this;
 %% `Root/*/src/**/*.erl' Our parameter R must be absolute. It also
@@ -106,9 +122,6 @@ c_src(Erl, O) ->
     end.
 
 %% teh compiler
-mk_compile(Root) ->
-    lists:foreach(fun code:add_pathz/1, wildname([Root, '*', ebin])),
-    fun(Erl) -> compile(Root, Erl) end.
 
 -record(result, {module, erl, beam, errors, warnings, root, incs}).
 -define(RESULT(Mod, Erl, Beam, Es, Ws, Root, Incs),

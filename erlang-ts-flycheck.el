@@ -8,17 +8,20 @@
 (require 'flycheck-popup-tip)
 (require 'erlang-ts-acer)
 
-(flycheck-popup-tip-mode)
-;;(global-flycheck-mode)
+(defun erlang-ts-flycheck-init ()
+  "Enable erlang-ts flychecker in current buffer."
+  (interactive)
+  ;; disable rebar flychecker
+  ;;(unless (memq 'erlang-rebar3 flycheck-disabled-checkers)
+  ;;  (push 'erlang-rebar3 flycheck-disabled-checkers))
 
-;; disable rebar flychecker
-(unless (memq 'erlang-rebar3 flycheck-disabled-checkers)
-  (push 'erlang-rebar3 flycheck-disabled-checkers))
-
-(setq flycheck-emacs-lisp-load-path 'inherit
-      flycheck-erlang-library-path (erlang-ts-acer-libs)
-      flycheck-protobuf-protoc-executable "protoc -I../../.."
-      flycheck-checker 'erlang-ts)
+  (let* ((scriptp (progn (save-excursion (goto-char 1) (looking-at "#!"))))
+         (checker (if scriptp 'erlang-ts-escript 'erlang-ts)))
+    (flycheck-popup-tip-mode)
+    (setq flycheck-emacs-lisp-load-path 'inherit
+          flycheck-erlang-library-path (erlang-ts-acer-libs)
+          flycheck-protobuf-protoc-executable "protoc -I../../.."
+          flycheck-checker checker)))
 
 (flycheck-define-checker erlang-ts-escript
   "An Erlang syntax checker using escript."

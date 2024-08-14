@@ -2,6 +2,9 @@
 
 -mode(compile).
 
+%%%    code:add_patha("/home/masse/git/redbug/_build/default/lib/redbug/ebin"),
+%%%    redbug:start("file:copy", #{msgs=>10000}),
+
 main(Args) ->
     try
         handle(Args)
