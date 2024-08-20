@@ -56,6 +56,7 @@
 
 (defun erlang-ts-acer-libs (&optional filename)
   "All libs in the project that FILENAME belongs to."
+  (interactive)
   (let ((f (if filename filename (buffer-file-name))))
     (pcase (split-string (etsa--run-escript-str "libs" f))
       ((and paths (guard (string= "libs:" (car paths))))

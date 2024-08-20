@@ -33,7 +33,10 @@ compiler_map({Root, Subjects}) ->
     #{t0 => millis_now(), workers => lists:map(mk_compile(Root), Subjects), results => []}.
 
 mk_compile(Root) ->
-    fun(S) -> {S, erlang:spawn_monitor(fun() -> exit({S, compile(Root, S)}) end)} end.
+    fun(S) -> {S, compiler_spawn(S, Root)} end.
+
+compiler_spawn(S, Root) ->
+    erlang:spawn_monitor(fun() -> exit({S, compile(Root, S)}) end).
 
 %% reduce the compilation results. Print a progress report every Tick
 %% seconds.
@@ -66,9 +69,15 @@ duration(T0) ->
 
 workers(Ws) ->
     case length(Ws) < 4 of
-        true -> flat(" [~s]", [string:join([mod(F) || {F, _} <- Ws], ", ")]);
+        true -> flat(" [~s]", [string:join(extract_srcs(Ws), ", ")]);
         false -> ""
     end.
+
+extract_srcs(Ws) ->
+    lists:map(fun extract_src/1, Ws).
+
+extract_src({{Csrc, _}, _}) -> "gcc "++Csrc;
+extract_src({Esrc, _}) -> mod(Esrc).
 
 %% We demand that the directory structure looks like this;
 %% `Root/*/src/**/*.erl' Our parameter R must be absolute. It also

@@ -2,95 +2,96 @@
 
 -mode(compile).
 
-%%%    code:add_patha("/home/masse/git/redbug/_build/default/lib/redbug/ebin"),
-%%%    redbug:start("file:copy", #{msgs=>10000}),
-
 main(Args) ->
-    try
-        handle(Args)
-    catch
-        C:R:S ->
-            io:fwrite("error: ~s:~p (~p)~n~p~n", [C, R, Args, S]),
-            halt(34)
+    redbug([]),
+    try handle(Args)
+    catch C:R:S -> die(34, Args, C, R, S)
     end.
 
-handle([]) -> io:fwrite("$0 cp SRC DEST - copy all apps under SRC to DEST.~n", []);
-handle(["cp", Src, Dest]) -> make_shadow(Src, Dest).
+die(Code, Args, C, R, S) ->
+    io:fwrite("error: ~s:~p (~p)~n~p~n", [C, R, Args, S]),
+    halt(Code).
 
-make_shadow(Src, Dest) ->
-    Count = lists:foldl(mk_cp_app(Dest), 0, appdirs(Src)),
+redbug([]) -> ok;
+redbug(Rtps) ->
+    D = join([os:getenv("HOME"), "git/redbug/_build/default/lib/redbug/ebin"]),
+    case (not (Rtps=:=[])) andalso is_dir(D) of
+        false -> ok;
+        true ->
+            code:add_patha(D),
+            redbug:start(Rtps, #{msgs=>10000})
+    end.
+
+handle([]) ->
+    io:fwrite("$0 cp SRC DEST - copy all apps under SRC to DEST.~n", []);
+handle(["cp", Src, Dest]) ->
+    make_shadow(Src, Dest, #{op => cp});
+handle(["ln", Src, Dest]) ->
+    make_shadow(Src, Dest, #{op => ln}).
+
+make_shadow(Src, Dest, Cfg) ->
+    Count = lists:foldl(mk_do_app(Dest, Cfg), 0, appdirs(Src)),
     io:fwrite("copied ~w apps from ~s to ~s.~n", [Count, Src, Dest]).
 
 appdirs(Src) ->
-    AppSrcPattern = filename:join(Src, "*/src/*.app.src"),
-    AppPattern = filename:join(Src, "*/ebin/*.app"),
-    AppFiles = filelib:wildcard(AppSrcPattern)++filelib:wildcard(AppPattern),
-    lists:usort(lists:map(fun dirname_dirname/1, AppFiles)).
+    AppSrcPattern = join([Src, "*/src/*.app.src"]),
+    AppPattern = join([Src, "*/ebin/*.app"]),
+    AppFiles = wildcard(AppSrcPattern)++wildcard(AppPattern),
+    lists:usort(lists:map(fun dir_dirname/1, AppFiles)).
 
-mk_cp_app(Dest) ->
-    fun(AppFile, N) -> cp_app(AppFile, Dest), N+1 end.
+mk_do_app(Dest, Cfg) ->
+    fun(AppFile, N) -> do_app(AppFile, Dest, Cfg), N+1 end.
 
-cp_app(AppDir, Dest) ->
-    DestAppDir = filename:join([Dest, filename:basename(AppDir)]),
-    Srcs = srcs(AppDir, DestAppDir),
-    extra(c_srcs, AppDir, DestAppDir),
-    extra(include, AppDir, DestAppDir),
-    extra(priv, AppDir, DestAppDir),
+do_app(AppDir, Dest, Cfg) ->
+    DestAppDir = join([Dest, basename(AppDir)]),
+    Srcs = srcs(AppDir, DestAppDir, Cfg),
+    extra(c_src, AppDir, DestAppDir, Cfg),
+    extra(include, AppDir, DestAppDir, Cfg),
+    extra(priv, AppDir, DestAppDir, Cfg),
     appfile(AppDir, Srcs, DestAppDir).
 
-srcs(AppDir, DestAppDir) ->
-    Srcs = filelib:wildcard(filename:join([AppDir, src, "**", "*"])),
-    DestSrcDir = filename:join([DestAppDir, src]),
-    lists:map(mk_cp(DestSrcDir, none), Srcs).
+srcs(AppDir, DestAppDir, Cfg) ->
+    Srcs = wildcard(join([AppDir, src, "**", "*"])),
+    DestSrcDir = join([DestAppDir, src]),
+    lists:map(mk_op(DestSrcDir, none, Cfg), Srcs).
 
-extra(Dir, AppDir, DestAppDir) ->
-    SrcPrefix = filename:join([AppDir, Dir]),
-    Xs = filelib:wildcard(filename:join([SrcPrefix, "**", "*"])),
-    DestDir = filename:join([DestAppDir, Dir]),
-    lists:map(mk_cp(DestDir, SrcPrefix), Xs).
+extra(Dir, AppDir, DestAppDir, Cfg) ->
+    SrcPrefix = join([AppDir, Dir]),
+    Xs = wildcard(join([SrcPrefix, "**", "*"])),
+    DestDir = join([DestAppDir, Dir]),
+    lists:map(mk_op(DestDir, SrcPrefix, Cfg), Xs).
 
-mk_cp(Dest, Prefix) ->
-    fun(Src) -> cp(Src, add_suffix(Src, Dest, Prefix)) end.
+mk_op(Dest, Prefix, Cfg) ->
+    fun(Src) -> op(Cfg, Src, add_suffix(Src, Dest, Prefix)) end.
 
 add_suffix(Src, Dest, Prefix) ->
-    filename:join(Dest, path_suffix(Src, Prefix)).
+    join([Dest, path_suffix(Src, Prefix)]).
 
 path_suffix(_, none) -> "";
 path_suffix(Src, Prefix) ->
-    case filename:dirname(string:prefix(Src, Prefix)) of
+    case dirname(string:prefix(Src, Prefix)) of
         "/"++S -> S;
         S -> error({prefix, Src, Prefix, S})
     end.
 
-%% SRC is a FQ filename, DESTDIR is a dirname.
-cp(Src, DestDir) ->
-    case filelib:is_regular(Src) of
-        true ->
-            SrcBaseName = filename:basename(Src),
-            Dest = filename:join(DestDir, SrcBaseName),
-            do_cp(Src, Dest);
-        false ->
-            skip
-    end.
-
 appfile(AppDir, Srcs, DestDir) ->
-    AppSrcFileName = filelib:wildcard(filename:join([AppDir, src, "*.app.src"])),
-    AppFileName = filelib:wildcard(filename:join([AppDir, ebin, "*.app"])),
-    DestEbin = filename:join([DestDir, ebin]),
-    case {filelib:is_regular(AppSrcFileName), filelib:is_regular(AppFileName)} of
+    AppSrcFileName = wildcard(join([AppDir, src, "*.app.src"])),
+    AppFileName = wildcard(join([AppDir, ebin, "*.app"])),
+    DestEbin = join([DestDir, ebin]),
+    case {is_regular(AppSrcFileName), is_regular(AppFileName)} of
         {false, false} ->
             error({neither, AppSrcFileName, AppFileName});
         {true, true} ->
             error({twins, AppSrcFileName, AppFileName});
         {false, true} ->
-            DestAppFileName = filename:join([DestEbin, filename:basename(AppFileName)]),
-            do_cp(AppFileName, DestAppFileName);
+            DestAppFileName = join([DestEbin, basename(AppFileName)]),
+            op(cp, AppFileName, DestAppFileName);
         {true, false} ->
-            DestAppFileName = filename:join([DestEbin, filename:basename(AppSrcFileName, ".src")]),
+            DestAppFileName = join([DestEbin, basename(AppSrcFileName, ".src")]),
             {ok, [{application, Aname, Adesc}]} = file:consult(AppSrcFileName),
             A = {application, Aname, app_items(Adesc, Srcs)},
-            Descr = iolist_to_binary(io_lib:format("~p.~n", [A])),
-            case ok == filelib:ensure_dir(DestAppFileName) andalso file:write_file(DestAppFileName, Descr) of
+            D = iolist_to_binary(io_lib:format("~p.~n", [A])),
+            case ensure_dir(DestAppFileName) andalso op(write, DestAppFileName, D) of
                 ok -> ok;
                 Err -> error({DestAppFileName, Err})
             end
@@ -116,20 +117,46 @@ app_version(AppDescr) ->
 mk_add_item(K, V) ->
     fun(X) -> lists:keystore(K, 1, X, {K, V}) end.
 
-dirname_dirname(File) ->
-    filename:dirname(filename:dirname(File)).
-
 filename_to_mod(Src, O) ->
-    case filename:extension(Src) of
-        ".erl" -> [list_to_atom(filename:basename(Src, ".erl"))|O];
+    case extension(Src) of
+        ".erl" -> [list_to_atom(basename(Src, ".erl"))|O];
         _ -> O
     end.
 
-do_cp(Src, Dest) ->
-    case ok == filelib:ensure_dir(Dest) andalso file:copy(Src, Dest) of
-        {ok, _} -> filename:basename(Src);
-        Err -> error({copy, Src, Dest, Err})
-    end.
+%% SRC is a FQ filename, DESTDIR is a dirname.
+op(#{op := Op}, Src, DestDir) ->
+    Dest = join([DestDir, basename(Src)]),
+    case is_regular(Src) andalso ensure_dir(Dest) andalso op(Op, Src, Dest) of
+        ok -> basename(Src);
+        _ -> skip
+    end;
+op(cp, Src, Dest) -> element(1, file:copy(Src, Dest));
+op(ln, Src, Dest) -> file:make_symlink(Src, Dest);
+op(write, Dest, X) -> file:write_file(Dest, X).
 
 pipe(S, Fs) ->
     lists:foldl(fun(F, Z) -> F(Z) end, S, Fs).
+
+dir_dirname(File) ->
+    dirname(dirname(File)).
+join(X) ->
+    filename:join(X).
+basename(X, Y) ->
+    filename:basename(X, Y).
+basename(X) ->
+    filename:basename(X).
+dirname(X) ->
+    filename:dirname(X).
+extension(X) ->
+    filename:extension(X).
+wildcard(X) ->
+    filelib:wildcard(X).
+is_dir(X) ->
+    filelib:is_dir(X).
+is_regular(X) ->
+    filelib:is_regular(X).
+ensure_dir(X) ->
+    case filelib:ensure_dir(X) of
+        ok -> true;
+        _ -> false
+    end.
