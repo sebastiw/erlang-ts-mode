@@ -88,13 +88,19 @@ appfile(AppDir, Srcs, DestDir) ->
             op(cp, AppFileName, DestAppFileName);
         {true, false} ->
             DestAppFileName = join([DestEbin, basename(AppSrcFileName, ".src")]),
-            {ok, [{application, Aname, Adesc}]} = file:consult(AppSrcFileName),
+            {Aname, Adesc} = app_src(AppSrcFileName),
             A = {application, Aname, app_items(Adesc, Srcs)},
             D = iolist_to_binary(io_lib:format("~p.~n", [A])),
             case ensure_dir(DestAppFileName) andalso op(write, DestAppFileName, D) of
                 ok -> ok;
                 Err -> error({DestAppFileName, Err})
             end
+    end.
+
+app_src(F) ->
+    case file:consult(F) of
+        {ok, [{application, Aname, Adescr}]} -> {Aname, Adescr};
+        Err -> error({app_src_fail, {F, Err}})
     end.
 
 app_items(Adescr, Srcs) ->

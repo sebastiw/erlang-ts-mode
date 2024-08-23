@@ -246,7 +246,7 @@ erlang_ts_file_expand(Subj, #{root := Root} = Cfg) ->
 erlang_ts_file_sh(WorkDir, Cmd) ->
     case sh(WorkDir, Cmd) of
         {ok, R} when 0 < length(R) -> lists:last(R);
-        {error, Err} -> error({sh, Err})
+        {error, Err} -> error({sh, WorkDir, Cmd, Err})
     end.
 
 erlang_ts_file_env(Subj, Vars, Cfg) ->
@@ -257,6 +257,8 @@ mk_erlang_ts_file_replace(#{env := Env}) ->
 
 erlang_ts_file_replacement("SELF", _) ->
     filename:dirname(escript:script_name());
+erlang_ts_file_replacement("HOME", _) ->
+    os:getenv("HOME");
 erlang_ts_file_replacement(Var, Env) ->
     maps:get(list_to_atom(Var), Env).
 
