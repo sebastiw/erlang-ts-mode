@@ -221,38 +221,58 @@ gcc_stanza(SOfile, Flags, Csrcs) ->
 %% the xrl (leex) compiler
 xrlc(Root, App, Xrl) ->
     Mod = mod(Xrl, ".xrl"),
-    Beam = join([Root, App, ebin, Mod++".beam"]),
-    ?RESULT(Mod, Xrl, Beam, [{not_implemented, leex}], [], []).
+    Beam = join([Root, App, ebin, Mod])++".beam",
+    Tmp = join([Root, App, ebin, Mod])++".erl",
+    filelib:ensure_dir(Tmp),
+    case leex:file(Xrl, [{scannerfile, Tmp}, {report, false}, deterministic, return]) of
+        {error, Es, Ws} -> ?RESULT(Mod, Xrl, Beam, Es, Ws, []);
+        {ok, Tmp, []} -> rm_erl(erlc(Root, Mod, Beam, Tmp, file_hash(Xrl)));
+        {ok, Tmp, Ws} -> ?RESULT(Mod, Xrl, Beam, [], Ws, [])
+    end.
 
 %% the yrl (yecc) compiler
 yrlc(Root, App, Yrl) ->
     Mod = mod(Yrl, ".yrl"),
-    Beam = join([Root, App, ebin, Mod++".beam"]),
-    ?RESULT(Mod, Yrl, Beam, [{not_implemented, yecc}], [], []).
+    Beam = join([Root, App, ebin, Mod])++".beam",
+    Tmp = join([Root, App, ebin, Mod])++".erl",
+    filelib:ensure_dir(Tmp),
+    case yecc:file(Yrl, [{parserfile, Tmp}, {report, false}, deterministic, return]) of
+        {error, Es, Ws} -> ?RESULT(Mod, Yrl, Beam, Es, Ws, []);
+        {ok, Tmp, []} -> rm_erl(erlc(Root, Mod, Beam, Tmp, file_hash(Yrl)));
+        {ok, Tmp, Ws} -> ?RESULT(Mod, Yrl, Beam, [], Ws, [])
+    end.
 
+%% util to remove temporary (generated) erl files.
+rm_erl(Result) ->
+    file:delete(Result#result.erl),
+    Result.
+    
 %% the erl compiler
 erlc(Root, App, Erl) ->
     Mod = mod(Erl, ".erl"),
-    Beam = join([Root, App, ebin, Mod++".beam"]),
+    Beam = join([Root, App, ebin, Mod])++".beam",
+    erlc(Root, Mod, Beam, Erl, file_hash(Erl)).
+
+erlc(Root, Mod, Beam, Erl, SrcHash) ->
     filelib:ensure_dir(Beam),
-    case source_hash(Beam) =:= file_hash(Erl) of
+    case source_hash(Beam) =:= SrcHash of
         true ->
             ?RESULT(Mod, Erl, Beam, cached, [], []);
         false ->
             Incs = incs(Root, Erl),
             case pre_erlc(Erl, Incs) of
-                [] -> erlc(Mod, Erl, Beam, Incs);
+                [] -> do_erlc(Mod, Erl, SrcHash, Beam, Incs);
                 Es -> ?RESULT(Mod, Erl, Beam, Es, [], Incs)
             end
     end.
 
-erlc(Mod, Erl, Beam, Incs) ->
-    Opts = opts(Erl, Incs),
+do_erlc(Mod, Erl, SrcHash, Beam, Incs) ->
+    Opts = opts(SrcHash, Incs),
     case compile:file(Erl, Opts) of
-        {ok, Mod, Bin} -> write(?RESULT(Mod, Erl, Beam, [], [], Incs), Bin);
+        {ok, Mod, Bin}     -> write(?RESULT(Mod, Erl, Beam, [], [], Incs), Bin);
         {ok, Mod, Bin, Ws} -> write(?RESULT(Mod, Erl, Beam, [], unroll_reports(Ws), Incs), Bin);
-        {error, Es, Ws} -> ?RESULT(Mod, Erl, "", unroll_reports(Es), unroll_reports(Ws), Incs);
-        error -> ?RESULT(Mod, Erl, "", [], [], Incs)
+        {error, Es, Ws}    -> ?RESULT(Mod, Erl, "", unroll_reports(Es), unroll_reports(Ws), Incs);
+        error              -> ?RESULT(Mod, Erl, "", [], [], Incs)
     end.
 
 pre_erlc(Erl, Incs) ->
@@ -275,9 +295,9 @@ pre_erlc_pred(_) -> false.
 unroll_reports(Wrapped) ->
     lists:sort(lists:flatmap(fun({_, R}) -> R end, Wrapped)).
 
-opts(Erl, Incs) ->
+opts(SrcHash, Incs) ->
     [binary,
-     {compile_info, cinf(Erl)},
+     {compile_info, cinf(SrcHash)},
      debug_info,
      deterministic,
      return|Incs].
@@ -286,11 +306,11 @@ incs(Root, Erl) ->
     [{i, Root},
      {i, dir_dirname(Erl)},
      {i, dir_dirname(Erl, [include])},
-     {i, filename:dirname(Erl)}].
+     {i, dirname(Erl)}].
 
-cinf(Erl) ->
+cinf(SrcHash) ->
     [{compiler, 'erlang-ts'},
-     {source_hash, file_hash(Erl)}].
+     {source_hash, SrcHash}].
 
 file_hash(File) ->
     erlang:phash2(file:read_file(File)).
@@ -368,7 +388,7 @@ basename(X) ->
     filename:basename(X).
 
 mod(Erl, Ext) ->
-    filename:basename(Erl, Ext).
+    list_to_atom(filename:basename(Erl, Ext)).
 
 wildcard(Es) ->
     filelib:wildcard(join(Es)).
