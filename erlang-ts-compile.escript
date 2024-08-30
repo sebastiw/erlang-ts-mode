@@ -19,17 +19,93 @@ main(Args) ->
 %% (a.k.a. map-reduce). Trying to figure out the dependency grph is
 %% silly; if the compilation fails due to a missing dependency we
 %% defer and recompile when the dependency appears.
+
 compile_all(R) ->
-    pipe(erls(R),
-         [fun compiler_map/1,
+    pipe(R,
+         [fun absname/1,
+          fun srcs/1,
+          fun compiler_map/1,
           fun compiler_reduce/1,
           fun results/1]).
+
+%% Return reified (without '..' and '.') absolute filename.
+
+absname(R) ->
+    pipe(R,
+         [fun filename:absname/1,
+          fun(X) -> string:tokens(X, "/") end,
+          fun(X) -> lists:foldl(fun reify_name/2, [], X) end,
+          fun lists:reverse/1,
+          fun lists:flatten/1]).
+
+reify_name(".", Es)  -> Es;
+reify_name("..", Es) -> tl(Es);
+reify_name(E, Es)    -> ["/"++E|Es].
+
+%% We demand that the directory structure looks like this;
+%% ROOT/APP/SRC/**/*.EXT. Our parameter R is an absolute filename,
+%% either ROOT, ROOT/APP, ROOT/APP/SRC, or ROOT/APP/SRC/*.EXT.
+%% SRC is src | c_src.
+%% EXT is erl | xrl | yrl | c | cc.
+
+srcs(R) ->
+    pipe([],
+         [fun(O) -> srcs(O, join([R, "*", wild_srcdirs(), "**", wild_basename()])) end,
+          fun(O) -> srcs(O, join([R, wild_srcdirs(), "**", wild_basename()])) end,
+          fun(O) -> srcs(O, join([assert_srcdir(R), "**", wild_basename()])) end,
+          fun(O) -> srcs(O, join([assert_srcdir(R)])) end]).
+
+assert_srcdir(R) ->
+    RE = flat("^(~s)/(~s)/~s", [re_root(), re_alnum(), re_src()]),
+    case regexp(R, RE) of
+        {match, _} -> R;
+        nomatch -> "NULL"
+    end.
+
+-record(srcs, {root, app, ext, srcs}).
+-define(SRC(R, A, E, S), #srcs{root = R, app = A, ext = E, srcs = S}).
+
+srcs(O, Wild) ->
+    lists:foldl(fun filter_src/2, O, wildcard(Wild)).
+
+filter_src(F, O) ->
+    RE = flat("^(~s)/(~s)/~s(/~s)*/~s$", [re_root(), re_alnum(), re_src(), re_alnum(), re_basename()]),
+    case regexp(F, RE) of
+        {match, [[Root, _, App|_]|_]} -> [?SRC(Root, App, extension(F), F)|O];
+        nomatch -> O
+    end.
+
+wild_srcdirs() ->
+    flat("{~s}", [string:join(srcdirs(), ",")]).
+wild_basename() ->
+    flat("*.{~s}", [string:join(extensions(), ",")]).
+
+re_basename() ->
+    flat("~s\\.~s", [re_alnum(), re_ext()]).
+re_ext() ->
+    string:join(extensions(), "|").
+re_src() ->
+    string:join(srcdirs(), "|").
+re_alnum() ->
+    "[a-zA-Z0-9_-]+".
+re_root() ->
+    "(/[a-zA-Z0-9_-]+)+".
+
+
+srcdirs() ->
+    ["src", "c_src"].
+extensions() ->
+    ["erl", "xrl", "yrl", "c", "cc"].
+
+regexp(R, RE) ->
+    Opts = [global, {capture, all_but_first, list}],
+    re:run(R, RE, Opts).
 
 %% map each file to a process. Also add all our ebins to the path so
 %% we can find behaviours.
 compiler_map({Root, Subjects}) ->
     io:fwrite("compiling: ~w files~n", [length(Subjects)]),
-    lists:foreach(fun code:add_pathz/1, wildname([Root, '*', ebin])),
+    lists:foreach(fun code:add_pathz/1, wildcard([Root, '*', ebin])),
     #{t0 => millis_now(), workers => lists:map(mk_compile(Root), Subjects), results => []}.
 
 mk_compile(Root) ->
@@ -79,58 +155,7 @@ extract_srcs(Ws) ->
 extract_src({{Csrc, _}, _}) -> "gcc "++Csrc;
 extract_src({Esrc, _}) -> mod(Esrc).
 
-%% We demand that the directory structure looks like this;
-%% `Root/*/src/**/*.erl' Our parameter R must be absolute. It also
-%% must be one of; 'Root', 'Root/A', 'Root/A/src'
-%% 'Root/A/src/**/M.erl'.
-%% We also look for 'X/src/../c_src'.
-
-erls(R) ->
-    try take_first(fun root_srcs/1, src_patterns(R))
-    catch throw:nothing -> []
-    end.
-
-%% return `false' if there are no erls, otherwise a list of erls.
-root_srcs(Pattern) ->
-    case filelib:wildcard(Pattern) of
-        [] -> throw(nothing);
-        Erls -> {root(hd(Erls)), Erls++c_src(Erls)}
-    end.
-
-root(Erl) ->
-    P = "^(/([a-zA-Z0-9_-]+/)+)[a-zA-Z0-9_]+/src/([a-zA-Z0-9_-]+/)*[a-zA-Z0-9_-]+.erl$",
-    Opts = [global, {capture, all_but_first, list}],
-    case re:run(Erl, P, Opts) of
-        {match, [[Root|_]]} -> Root;
-        nomatch -> []
-    end.
-
-%% We require a src to match 'Root/*/src/**/*.erl'.
-%% R must be one of;
-%%    'Root'
-%%    'Root/A'
-%%    'Root/A/src'
-%%    'Root/A/src/M.erl'
-%% Return a list of the 4 possible patterns.
-src_patterns(R) ->
-    [fnjoin([R, '*', src, '**', '*.erl']),
-     fnjoin([R, src, '**', '*.erl']),
-     fnjoin([R, '**', '*.erl']),
-     R].
-
-%% find c_src next to the erls, if there is any.
-c_src(Erls) ->
-    CsrcDirs = lists:foldl(fun c_src/2, [], Erls),
-    [{dirname_basename(Csrc), wildname([Csrc, '**', "*.{c,cc}"])} || Csrc <- CsrcDirs].
-
-c_src(Erl, O) ->
-    Candidate = fnjoin([dirname_dirname(Erl), 'c_src']),
-    case filelib:is_dir(Candidate) of
-        true -> [Candidate|O];
-        false -> O
-    end.
-
-%% teh compiler
+%% the compiler
 
 -record(result, {module, erl, beam, errors, warnings, root, incs}).
 -define(RESULT(Mod, Erl, Beam, Es, Ws, Root, Incs),
@@ -153,7 +178,7 @@ cc(Root, {"crc32cer", Csrcs}) ->
     cc(Root, crc32cer, "crc32cer_nif.so", "-std=gnu99 -finline-functions", Csrcs).
 
 cc(Root, App, SO, Flags, Csrcs) ->
-    SOfile = fnjoin([Root, App, priv, SO]),
+    SOfile = join([Root, App, priv, SO]),
     filelib:ensure_dir(SOfile),
     GccStanza = gcc_stanza(SOfile, Flags, Csrcs),
     Cmd = flat("~s ; echo $?", [GccStanza]),
@@ -163,7 +188,7 @@ cc(Root, App, SO, Flags, Csrcs) ->
     end.
 
 gcc_stanza(SOfile, Flags, Csrcs) ->
-    ErlUsr = fnjoin([code:root_dir(), usr]),
+    ErlUsr = join([code:root_dir(), usr]),
     CC = "gcc -o ~s -shared -fpic -O3 ",
     Incs = " -I ~s/include -L ~s/lib -lei ",
     Srcs = lists:flatmap(fun(S) -> " "++S end, Csrcs),
@@ -215,8 +240,8 @@ opts(Erl, Incs) ->
 
 incs(Root, Erl) ->
     [{i, Root},
-     {i, dirname_dirname(Erl)},
-     {i, dirname_dirname(Erl, [include])},
+     {i, dir_dirname(Erl)},
+     {i, dir_dirname(Erl, [include])},
      {i, filename:dirname(Erl)}].
 
 cinf(Erl) ->
@@ -285,34 +310,29 @@ result(Level, ?RESULT(Mod, Erl, _, Es, Ws, _, Incs)) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% utils
 
-dirname_basename(F) ->
-    filename:basename(filename:dirname(F)).
+dir_dirname(F, Suffix) ->
+    join([dir_dirname(F)|Suffix]).
 
-dirname_dirname(F, Suffix) ->
-    fnjoin([dirname_dirname(F)|Suffix]).
+dir_dirname(F) ->
+    dirname(dirname(F)).
 
-dirname_dirname(F) ->
-    filename:dirname(filename:dirname(F)).
-
-wildname(Es) ->
-    filelib:wildcard(fnjoin(Es)).
-
-fnjoin(X) ->
-    filename:join(X).
+dirname(X) ->
+    filename:dirname(X).
 
 beamfile(Erl) ->
-    dirname_dirname(Erl, [ebin, mod(Erl)++".beam"]).
+    dir_dirname(Erl, [ebin, mod(Erl)++".beam"]).
 
 mod(Erl) ->
     filename:basename(Erl, ".erl").
 
-%% Call F(I) on each element in Is until we find an V = F(I) that does
-%% not throw an exception. Return V or throw(nothing).
-take_first(_, []) -> throw(nothing);
-take_first(F, [P|Patterns]) ->
-    try F(P)
-    catch _:_ -> take_first(F, Patterns)
-    end.
+extension(X) ->
+    filename:extension(X).
+
+wildcard(Es) ->
+    filelib:wildcard(join(Es)).
+
+join(X) ->
+    filename:join(X).
 
 flat(F, As) ->
     lists:flatten(io_lib:format(F, As)).
@@ -321,4 +341,13 @@ millis_now() ->
     erlang:system_time(millisecond).
 
 pipe(A0, Fs) ->
-    lists:foldl(fun(F, A) -> F(A) end, A0, Fs).
+    pipe(A0, null, Fs).
+
+pipe(A0, Ctx, Fs) ->
+    lists:foldl(mk_pipe(Ctx), A0, Fs).
+
+mk_pipe(C) ->
+    fun(F, A) -> pipe(F, A, C, erlang:fun_info(F, arity)) end.
+
+pipe(F, A, _, {_, 1}) -> F(A);
+pipe(F, A, C, {_, 2}) -> F(A, C).
