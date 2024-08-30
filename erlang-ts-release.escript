@@ -5,7 +5,7 @@
 main(Args) ->
     case Args of
         [] -> io:fwrite("Build a release using relx.");
-        ["starlet", Root] -> release(starlet, Root)
+        [System, Root] -> release(list_to_atom(System), Root)
     end.
     
 release(System, Root) ->
