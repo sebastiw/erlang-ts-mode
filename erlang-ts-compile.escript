@@ -204,11 +204,18 @@ cc(Root, "crc32cer", Csrcs) ->
 cc(Root, App, SO, Flags, Csrcs) ->
     SOfile = join([Root, App, priv, SO]),
     filelib:ensure_dir(SOfile),
+    case check_hashes(SOfile, Csrcs) orelse run_cc(SOfile, App, Flags, Csrcs) of
+        true -> ?RESULT(App, Csrcs, SOfile, cached, [], []);
+        R = #result{error = []} -> write_hashes(Csrcs, SOfile), R;
+        R = #result{error = [_|_]} -> rm_hashes(SOfile), R
+    end.
+
+run_cc(SOfile, App, Flags, Csrcs) ->
     GccStanza = gcc_stanza(SOfile, Flags, Csrcs),
     Cmd = flat("~s ; echo $?", [GccStanza]),
     case os:cmd(Cmd) of
-        "0\n" -> ?RESULT(SOfile, "", "", [], [], GccStanza);
-        Err -> ?RESULT(SOfile, "", "", [lists:filter(fun(C)->C<128 end, Err)], [], GccStanza)
+        "0\n" -> ?RESULT(App, Csrcs, SOfile, [], [], Flags);
+        Err -> ?RESULT(App, Csrcs, SOfile, [lists:filter(fun(C)->C<128 end, Err)], [], Flags)
     end.
 
 gcc_stanza(SOfile, Flags, Csrcs) ->
@@ -226,7 +233,7 @@ xrlc(Root, App, Xrl) ->
     filelib:ensure_dir(Tmp),
     case leex:file(Xrl, [{scannerfile, Tmp}, {report, false}, deterministic, return]) of
         {error, Es, Ws} -> ?RESULT(Mod, Xrl, Beam, Es, Ws, []);
-        {ok, Tmp, []} -> rm_erl(erlc(Root, Mod, Beam, Tmp, file_hash(Xrl)));
+        {ok, Tmp, []} -> rm_erl(erlc(Root, Mod, Beam, Tmp, file_hash([Xrl])));
         {ok, Tmp, Ws} -> ?RESULT(Mod, Xrl, Beam, [], Ws, [])
     end.
 
@@ -238,7 +245,7 @@ yrlc(Root, App, Yrl) ->
     filelib:ensure_dir(Tmp),
     case yecc:file(Yrl, [{parserfile, Tmp}, {report, false}, deterministic, return]) of
         {error, Es, Ws} -> ?RESULT(Mod, Yrl, Beam, Es, Ws, []);
-        {ok, Tmp, []} -> rm_erl(erlc(Root, Mod, Beam, Tmp, file_hash(Yrl)));
+        {ok, Tmp, []} -> rm_erl(erlc(Root, Mod, Beam, Tmp, file_hash([Yrl])));
         {ok, Tmp, Ws} -> ?RESULT(Mod, Yrl, Beam, [], Ws, [])
     end.
 
@@ -246,12 +253,12 @@ yrlc(Root, App, Yrl) ->
 rm_erl(Result) ->
     file:delete(Result#result.erl),
     Result.
-    
+
 %% the erl compiler
 erlc(Root, App, Erl) ->
     Mod = mod(Erl, ".erl"),
     Beam = join([Root, App, ebin, Mod])++".beam",
-    erlc(Root, Mod, Beam, Erl, file_hash(Erl)).
+    erlc(Root, Mod, Beam, Erl, file_hash([Erl])).
 
 erlc(Root, Mod, Beam, Erl, SrcHash) ->
     filelib:ensure_dir(Beam),
@@ -312,8 +319,8 @@ cinf(SrcHash) ->
     [{compiler, 'erlang-ts'},
      {source_hash, SrcHash}].
 
-file_hash(File) ->
-    erlang:phash2(file:read_file(File)).
+file_hash(Files) ->
+    erlang:phash2([file:read_file(F) || F <- Files]).
 
 source_hash(Beam) ->
     try
@@ -323,6 +330,29 @@ source_hash(Beam) ->
     catch
         _:_ -> undefined
     end.
+
+check_hashes(Artefact, Srcs) ->
+    case file:read_file(filename_hashes(Artefact)) of
+        {ok, B} ->
+            case regexp(B, "^([0-9]+) => ([0-9]+).$") of
+                {match, [[H1, H2]]} -> compare_hash(H1, Srcs) andalso compare_hash(H2, [Artefact]);
+                _ -> false
+            end;
+        _ -> false
+    end.
+
+compare_hash(Hash, Srcs) ->
+    file_hash(Srcs) =:= list_to_integer(Hash).
+
+write_hashes(Srcs, Artefact) ->
+    Str = flat("~w => ~w.~n", [file_hash(Srcs), file_hash([Artefact])]),
+    file:write_file(filename_hashes(Artefact), Str).
+
+rm_hashes(Artefact) ->
+    file:delete(filename_hashes(Artefact)).
+
+filename_hashes(File) ->
+    join([dirname(File), ".starc"]).
 
 write(Result, Bin) ->
     case file:write_file(Result#result.beam, Bin) of
