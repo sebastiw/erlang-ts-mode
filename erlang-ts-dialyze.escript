@@ -2,6 +2,11 @@
 
 -mode(compile).
 
+-compile({nowarn_unused_function, [dbg/1]}).
+dbg({error, L, M, F, R}) -> error({L, M, F, R});
+dbg({T, L, M, F, R}) -> io:fwrite(standard_error, "~n~p ~s:~s::~w ~p~n", [T, M, F, L, R]), R.
+-define(DBG(Tag, X), dbg({Tag, ?LINE, ?MODULE, ?FUNCTION_NAME, X})).
+
 %% We consider a set of apps. We group them into subsets;
 %% 1) OTP apps
 %% 2) Project apps
@@ -18,6 +23,8 @@
 %%
 %% We expect our caller to give us ARGS as a list of "KEY=VALUE" strings.
 
+main([]) ->
+    io:fwrite("$0 dialyze ARGS.~n", []);
 main(Args) ->
     pipe(Args,
          [fun config/1,
@@ -117,15 +124,15 @@ dialyzer_opts(analyze, {Apps, PLTs}) ->
 %% make configs from command line args
 
 config(RawArgs) ->
-    Args = raw_args_to_map(RawArgs),
-    pipe(#{},
+    Args = ?DBG(as, raw_args_to_map(RawArgs)),
+    ?DBG(cfgs, pipe(#{},
          [mk_cfg(base_dir, Args),
           mk_cfg(otp_apps, Args),
           mk_cfg(ext_apps, Args),
           mk_cfg(gen_apps, Args),
           mk_cfg(int_apps, Args),
           mk_cfg(plts, Args),
-          mk_cfg(target, Args)]).
+          mk_cfg(target, Args)])).
 
 raw_args_to_map(Args) ->
     pipe(Args,
@@ -158,15 +165,21 @@ get_arg(otp_apps, _, As) ->
     [list_to_atom(App) || App <- maps:get("otp_apps", As)];
 get_arg(ext_apps, Cfg, As) ->
     %% external_apps = project_apps - internal_apps
-    filter_apps(maps:get("project_apps", As) -- maps:get("internal_apps", As), Cfg);
+    filter_apps(maps:get("project_apps", As, []) -- maps:get("internal_apps", As, []), Cfg);
 get_arg(gen_apps, Cfg, As) ->
     %% generated_apps
-    filter_apps(maps:get("generated_apps", As), Cfg);
+    filter_apps(maps:get("generated_apps", As, []), Cfg);
 get_arg(int_apps, Cfg, As) ->
     %% interesting_apps = internal_apps - generated_apps
-    filter_apps(maps:get("internal_apps", As), Cfg) -- maps:get(gen_apps, Cfg);
-get_arg(plts, #{base_dir := BaseDir}, _) ->
-    [plt_name(BaseDir, P) || P <- ["otp", "ext", "gen", "int"]].
+    filter_apps(maps:get("internal_apps", As, []), Cfg) -- maps:get(gen_apps, Cfg);
+get_arg(plts, #{base_dir := BaseDir} = Cfg, _) ->
+    [plt_name(BaseDir, P) || P <- ["otp", "ext", "gen", "int"], is_dialyzable(P, Cfg)].
+
+is_dialyzable("otp", #{otp_apps := [_|_]}) -> true;
+is_dialyzable("ext", #{ext_apps := [_|_]}) -> true;
+is_dialyzable("int", #{int_apps := [_|_]}) -> true;
+is_dialyzable("gen", #{gen_apps := [_|_]}) -> true;
+is_dialyzable(_, _) -> false.
 
 plt_name(Dir, Base) ->
     filename:join([Dir, Base++".plt"]).
