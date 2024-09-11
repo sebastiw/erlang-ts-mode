@@ -18,6 +18,10 @@ _err() {
     exit 1
 }
 
+_brew_install() {
+    echo ok
+}
+
 _apt_install() {
     mapfile -td" " ps < <(echo -n "$*")
     local pps=()
@@ -81,7 +85,8 @@ _http_get() {
          echo "$dest"
     elif mkdir -p "$(dirname "$dest")" &&
             curl -sSL "$url" -o "$dest"
-    then echo "$dest"
+    then 1>&2 echo "ok."
+         echo "$dest"
     else _err "Download failed."
     fi
 }
@@ -97,25 +102,29 @@ _untar() {
 _configure() {
     local dir=${1:?}
     local dest=${2:?}
+    case $(uname -s) in
+        Darwin) sctp="--disable-sctp";;
+        Linux) sctp="--enable-sctp=lib";;
+    esac
     cd "$dir"
     2>/dev/null ./configure \
-                --prefix="$dest" \
-                --without-debugger \
-                --without-eldap \
-                --without-erl_docgen \
-                --without-et \
-                --without-ftp \
-                --without-hipe \
-                --without-javac \
-                --without-jinterface \
-                --without-megaco \
-                --without-observer \
-                --without-odbc \
-                --without-tftp \
-                --without-wx \
-                --without-dynamic-trace \
-                --enable-sctp=lib \
-                --disable-lock-counter &&
+         "$sctp" \
+         --prefix="$dest" \
+         --without-debugger \
+         --without-eldap \
+         --without-erl_docgen \
+         --without-et \
+         --without-ftp \
+         --without-hipe \
+         --without-javac \
+         --without-jinterface \
+         --without-megaco \
+         --without-observer \
+         --without-odbc \
+         --without-tftp \
+         --without-wx \
+         --without-dynamic-trace \
+         --disable-lock-counter &&
         pwd
 }
 
@@ -150,7 +159,6 @@ res=$(_deps) &&
     echo "get: $tgz" &&
     res=$(_untar "$tgz") &&
     bdir=$res &&
-    rm -rf "$tgz" &&
     echo "untar: $bdir" &&
     tag=$(grep -Eo "[0-9.]+$" <<<"$tag") &&
     prefix="$dest/erl-$tag" &&
@@ -160,8 +168,10 @@ res=$(_deps) &&
     echo "Compiled." &&
     res=$(_install "$bdir") &&
     echo "Installed in $prefix." &&
+    rm -rf "$tgz" &&
     rm -rf "$bdir" &&
     exit 0
 
 # we only get here is there is a failure above
 echo "$res"
+exit 33
