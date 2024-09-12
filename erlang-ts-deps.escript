@@ -13,28 +13,30 @@ main(Args) ->
     end.
 
 handle([]) ->
-    io:fwrite("$0 dep NAME URL - Fetch application NAME from URL.~n", []);
-handle(["dep", Site, Proj, Name, Dest]) ->
-    pipe(url_releases(Site, Proj, Name),
+    io:fwrite("$0 dep SITE ORG PROJ VSN DEST - Fetch dependency PROJ from SITE/ORG/PROJ and install it in DEST.~n", []);
+handle(["dep", Site, Org, Proj, Dest]) ->
+    handle(["dep", Site, Org, Proj, "", Dest]);
+handle(["dep", Site, Org, Proj, Vsn, Dest]) ->
+    pipe(url_releases(Site, Org, Proj),
          [fun http_get/1,
-          mk_newest_tgz(Site, Proj, Name),
+          mk_newest_tgz(Site, Org, Proj, Vsn),
           fun http_get/1,
           fun zlib:gunzip/1,
-          mk_tar(Name),
-          mk_writer(Name, Dest),
-          fun(X) -> io:fwrite("Wrote ~p files to ~s/~s.~n", [X, Dest, Name]) end]).
+          mk_tar(Proj),
+          mk_writer(Proj, Dest),
+          fun(X) -> io:fwrite("Wrote ~p files to ~s/~s.~n", [X, Dest, Proj]) end]).
 
-url_releases(Site, Proj, Name) ->
-    string:join([Site, Proj, Name, "releases"], "/").
+url_releases(Site, Org, Proj) ->
+    string:join([Site, Org, Proj, "releases"], "/").
 
-mk_newest_tgz(Site, Proj, Name) ->
-    fun(Subj) -> newest_tgz(Subj, Site, Proj, Name) end.
+mk_newest_tgz(Site, Org, Proj, Vsn) ->
+    fun(Subj) -> newest_tgz(Subj, Site, Org, Proj, Vsn) end.
 
-newest_tgz(Subj, Site, Proj, Name) ->
-    RE = flat("<a href=\"/~s/~s/releases/tag/([v0-9.]+)", [Proj, Name]),
+newest_tgz(Subj, Site, Org, Proj, Vsn) ->
+    RE = flat("<a href=\"/~s/~s/releases/tag/(v?~s[0-9.]+)", [Org, Proj, Vsn]),
     case re:run(Subj, RE, [{capture, all_but_first, list}, global]) of
-        {match, [[Tag]|_]} -> flat("~s/~s/~s/archive/refs/tags/~s.tar.gz", [Site, Proj, Name, Tag]);
-        Err -> error({release, {Site, Proj, Name, Err}})
+        {match, [[Tag]|_]} -> flat("~s/~s/~s/archive/refs/tags/~s.tar.gz", [Site, Org, Proj, Tag]);
+        Err -> error({release, {Site, Org, Proj, Vsn, Err}})
     end.
 
 http_get(Url) ->
@@ -45,8 +47,8 @@ http_get(Url) ->
         _Err -> error({get, {Url}})
     end.
 
-mk_tar(Name) ->
-    RE = mk_regexp(flat("^~s-[0-9.]*/(src|priv|LICENSE|README)", [Name])),
+mk_tar(Proj) ->
+    RE = mk_regexp(flat("^~s-[0-9.]*/(src|priv|LICENSE|README)", [Proj])),
     fun(B) -> tar(RE, B) end.
 
 tar(RE, B) ->
@@ -56,14 +58,14 @@ tar(RE, B) ->
 mk_regexp(RE) ->
     fun(Subject) -> nomatch =/= re:run(Subject, RE) end.
 
-mk_writer(Name, Dest) ->
-    fun({ok, Files}) -> lists:foldl(mk_write(Name, Dest), 0, Files) end.
+mk_writer(Proj, Dest) ->
+    fun({ok, Files}) -> lists:foldl(mk_write(Proj, Dest), 0, Files) end.
 
-mk_write(Name, Dest) ->
-    fun({Filename, Text}, N) -> write(filename(Dest, Name, Filename), Text), N+1 end.
+mk_write(Proj, Dest) ->
+    fun({Filename, Text}, N) -> write(filename(Dest, Proj, Filename), Text), N+1 end.
 
-filename(Dest, Name, Filename) ->
-    filename:join([Dest, Name|tl(string:tokens(Filename, "/"))]).
+filename(Dest, Proj, Filename) ->
+    filename:join([Dest, Proj|tl(string:tokens(Filename, "/"))]).
 
 write(Filename, Text) ->
     try filelib:ensure_dir(Filename), ok = file:write_file(Filename, Text)

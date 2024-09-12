@@ -62,6 +62,10 @@ check_and_build_plt(PLT, Cfg) ->
         false -> build_plt(PLT, Cfg)
     end.
 
+%% dialyzer --check_plt is way slow. What we really want to do here is
+%% something like this;
+%% erlang:phash2([beam_lib:md5(F)||F<-filelib:wildcard("/tmp/starlet/*/ebin/*.beam")]).
+%% So, a hash on all beam MD5, which we cache in a .starc file.
 check_plt(PLT) ->
     filelib:is_regular(PLT) andalso [] =:= dialyzer(check_plt, PLT).
 
@@ -86,7 +90,7 @@ plt_apps(PLT, Cfg) ->
         "gen" -> {files_rec, maps:get(gen_apps, Cfg, [])}
     end.
 
-analyze(#{target := []}) -> 
+analyze(#{target := []}) ->
     progress([], "analyze (no targets): ~n", []);
 analyze(#{target := Apps, plts := PLTs}) ->
     progress(ok, "analyze: ~p...", [Apps]),
@@ -124,15 +128,15 @@ dialyzer_opts(analyze, {Apps, PLTs}) ->
 %% make configs from command line args
 
 config(RawArgs) ->
-    Args = ?DBG(as, raw_args_to_map(RawArgs)),
-    ?DBG(cfgs, pipe(#{},
+    Args = raw_args_to_map(RawArgs),
+    pipe(#{},
          [mk_cfg(base_dir, Args),
           mk_cfg(otp_apps, Args),
           mk_cfg(ext_apps, Args),
           mk_cfg(gen_apps, Args),
           mk_cfg(int_apps, Args),
           mk_cfg(plts, Args),
-          mk_cfg(target, Args)])).
+          mk_cfg(target, Args)]).
 
 raw_args_to_map(Args) ->
     pipe(Args,
@@ -214,7 +218,7 @@ progress(X, F, As) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% Map is a fun() -> [fun()]. 
+%% Map is a fun() -> [fun()].
 map_reduce(Map) ->
     reduce(reduce_init(map(Map))).
 

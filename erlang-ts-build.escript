@@ -8,13 +8,14 @@ dbg({T, L, M, F, R}) -> io:fwrite(standard_error, "~n~p ~s:~s::~w ~p~n", [T, M, 
 -define(DBG(Tag, X), dbg({Tag, ?LINE, ?MODULE, ?FUNCTION_NAME, X})).
 
 main(Args) ->
-    redbug([]),
     try handle(Args)
     catch C:R:S -> die(34, Args, C, R, S)
     end.
 
+usage() ->
+    print(["$0 cp | ln SRC DEST - copy/link all apps under SRC to DEST."]).
 handle([]) ->
-    io:fwrite("$0 cp SRC DEST - copy all apps under SRC to DEST.~n", []);
+    usage();
 handle(["cp", Src, Dest]) ->
     make_shadow(Src, Dest, #{op => cp});
 handle(["ln", Src, Dest]) ->
@@ -22,7 +23,10 @@ handle(["ln", Src, Dest]) ->
 
 make_shadow(Src, Dest, Cfg) ->
     Count = lists:foldl(mk_do_app(Dest, Cfg), 0, appdirs(Src)),
-    io:fwrite("copied ~w apps from ~s to ~s.~n", [Count, Src, Dest]).
+    io:fwrite("~s ~w apps from ~s to ~s.~n", [opstring(Cfg), Count, Src, Dest]).
+
+opstring(#{op := ln}) -> "Linked";
+opstring(#{op := cp}) -> "Copied".
 
 appdirs(Src) ->
     Ws = [join([Src|A++B]) || A <- [[], ['*']], B <- [[src, "*.app.src"], [ebin,  "*.app"]]],
@@ -41,15 +45,39 @@ do_app(AppDir, Dest, Cfg) ->
     appfile(appfilename(AppDir), Srcs, DestAppDir).
 
 srcs(AppDir, DestAppDir, Cfg) ->
-    Srcs = wildcard(join([AppDir, src, "**", "*"])),
+    Srcs = dedup(wildcard(join([AppDir, src, "**", "*"]))),
     DestSrcDir = join([DestAppDir, src]),
     lists:map(mk_op(DestSrcDir, none, Cfg), Srcs).
 
 extra(Dir, AppDir, DestAppDir, Cfg) ->
     SrcPrefix = join([AppDir, Dir]),
-    Xs = wildcard(join([SrcPrefix, "**", "*"])),
+    Xs = dedup(wildcard(join([SrcPrefix, "**", "*"]))),
     DestDir = join([DestAppDir, Dir]),
     lists:map(mk_op(DestDir, SrcPrefix, Cfg), Xs).
+
+%% deduplicate. E.g. keep only one of 'a.xrl' and 'a.erl'.
+%% also remove directories.
+dedup(Srcs) ->
+    lists:append(maps:values(lists:foldl(fun(Src, O) -> dedup(Src, O) end, #{}, Srcs))).
+
+dedup(Src, O) ->
+    case is_regular(Src) of
+        true -> maps:update_with(mod(Src), mk_dedup_picker(Src), [Src], O);
+        false -> O
+    end.
+
+mk_dedup_picker(Src) ->
+    fun([Src0]) -> dedup_picker(Src, Src0) end.
+
+dedup_picker(S1, S2) ->
+    case lists:sort([{extension(S1), S1}, {extension(S2), S2}]) of
+        [{".erl", F1}, {".erl", F2}] -> error({dedup, {F1, F2}});
+        [{".c", F1}, {_, F2}] -> [F1, F2];
+        [{".cc", F1}, {_, F2}] -> [F1, F2];
+        [{".erl", F1}, {".hrl", F2}] -> [F1, F2];
+        [{".erl", _}, {_, F2}] -> [F2];
+        [{_, F1}, {_, F2}] -> error({dedup, {F1, F2}})
+    end.
 
 mk_op(Dest, Prefix, #{op := Op}) ->
     fun(Src) -> op(Op, Src, add_suffix(Src, Dest, Prefix)) end.
@@ -92,7 +120,7 @@ app_src(F) ->
     end.
 
 app_items(Adescr, Srcs) ->
-    Mods = ?DBG(mods, lists:foldl(fun filename_to_mod/2, [], ?DBG(srcs, Srcs))),
+    Mods = lists:foldl(fun(Src, O) -> [mod(Src)|O] end, [], Srcs),
     pipe(Adescr,
          [mk_add_item(modules, Mods),
           mk_add_item(registered, []),
@@ -111,8 +139,8 @@ app_version(AppDescr) ->
 mk_add_item(K, V) ->
     fun(X) -> lists:keystore(K, 1, X, {K, V}) end.
 
-filename_to_mod(Src, O) ->
-    [list_to_atom(basename(Src, extension(Src)))|O].
+mod(Src) ->
+    list_to_atom(basename(Src, extension(Src))).
 
 %% X is an iolist, DEST is a FQ filename.
 op(write, X, Dest) ->
@@ -172,8 +200,6 @@ extension(X) ->
     filename:extension(X).
 wildcard(X) ->
     filelib:wildcard(X).
-is_dir(X) ->
-    filelib:is_dir(X).
 is_regular(X) ->
     filelib:is_regular(X).
 ensure_dir(X) ->
@@ -186,12 +212,5 @@ die(Code, Args, C, R, S) ->
     io:fwrite("error: ~s:~p (~p)~n~p~n", [C, R, Args, S]),
     halt(Code).
 
-redbug([]) -> ok;
-redbug(Rtps) ->
-    D = join([os:getenv("HOME"), "git/redbug/_build/default/lib/redbug/ebin"]),
-    case (not (Rtps=:=[])) andalso is_dir(D) of
-        false -> ok;
-        true ->
-            code:add_patha(D),
-            redbug:start(Rtps, #{msgs=>10000})
-    end.
+print(Strings) ->
+    lists:foreach(fun(S) -> io:fwrite("~s~n", [S]) end, Strings).
