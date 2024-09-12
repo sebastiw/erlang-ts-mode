@@ -131,23 +131,30 @@ _configure() {
 _compile() {
     local dir=${1:?}
     cd "$dir"
-    make -j8 && pwd
+    2>/dev/null \
+        make -j8 &&
+        pwd
 }
 
 _install() {
     local dir=${1:?}
     cd "$dir"
-    make install && pwd
+    2>/dev/null \
+        make install &&
+        pwd
 }
 
+# our parameters
 site="https://github.com"
 org="erlang"
 proj="otp"
 vsn="${1:-}"
 dest="${2:-}"
 
+# check that we have mandatory args
 [[ -n "$vsn" && -n "$dest" ]] || _usage
 
+# if any of these stanzas fail, we have an error string in $res
 res=$(_deps) &&
     echo "deps: $res" &&
     res=$(_newest $site "$org/$proj" "$vsn") &&
