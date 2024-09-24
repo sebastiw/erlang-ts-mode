@@ -88,7 +88,7 @@ re_ext() ->
 re_src() ->
     string:join(srcdirs(), "|").
 re_alnum() ->
-    "[a-zA-Z0-9_-]+".
+    "[a-zA-Z0-9_.-]+".
 
 srcdirs() ->
     ["src", "c_src"].

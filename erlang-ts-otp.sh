@@ -92,16 +92,20 @@ _http_get() {
 }
 
 _untar() {
-    local tgz=${1:?} dir base
+    local tgz=${1:?}
+    local tag=${2:?}
+    local dir
+
     dir=$(dirname "$tgz")
-    base=$(basename "$tgz" .tgz)
-    tar -xzf "$tgz" -C "$dir" &&
-        (cd "$dir/otp-$base" ; pwd)
+    tar -xzf "$tgz" -C "$dir"
+    cd "$dir/otp-$tag"
+    pwd
 }
 
 _configure() {
     local dir=${1:?}
     local dest=${2:?}
+
     case $(uname -s) in
         Darwin) sctp="--disable-sctp";;
         Linux) sctp="--enable-sctp=lib";;
@@ -124,24 +128,21 @@ _configure() {
          --without-tftp \
          --without-wx \
          --without-dynamic-trace \
-         --disable-lock-counter &&
-        pwd
+         --disable-lock-counter
 }
 
 _compile() {
     local dir=${1:?}
     cd "$dir"
     2>/dev/null \
-        make -j8 &&
-        pwd
+        make -j8
 }
 
 _install() {
     local dir=${1:?}
     cd "$dir"
     2>/dev/null \
-        make install &&
-        pwd
+        make install
 }
 
 # our parameters
@@ -164,7 +165,7 @@ res=$(_deps) &&
     res=$(_http_get "$url" "$dest/$tag.tgz") &&
     tgz=$res &&
     echo "get: $tgz" &&
-    res=$(_untar "$tgz") &&
+    res=$(_untar "$tgz" "$tag") &&
     bdir=$res &&
     echo "untar: $bdir" &&
     tag=$(grep -Eo "[0-9.]+$" <<<"$tag") &&
