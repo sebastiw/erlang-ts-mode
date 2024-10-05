@@ -21,6 +21,7 @@
        (goto-char 1)
        (when (re-search-forward (concat "man/man3/" m ".3"))
          (woman-tar-extract-file)
+         (set-buffer-modified-p nil)
          (when (and f (re-search-forward (concat "\s" f "(") nil t))
            (beginning-of-line)))))))
 
